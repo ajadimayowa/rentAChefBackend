@@ -1,16 +1,18 @@
 import { Router } from 'express';
 // import { register, login } from '../controllers/auth.controller';
-import { createUser,loginUser,verifyUserEmail,verifyLoginOtp, requestPasswordResetOtp,resetUserPasswordWithOtp } from '../controllers/auth/user';
-import { verifyToken } from '../middleware/auth.middleware';
+
+import { verifyToken } from '../../middleware/auth.middleware';
+import { login, register, verifyEmail, verifyLoginOtp } from '../../controllers/chefAuthControllers/auth.controller';
 
 const router = Router();
 
-router.post('/auth/register', createUser);
-router.post('/auth/login', loginUser);
-router.post('/auth/verify-otp', verifyLoginOtp);
-router.post('/auth/verify-email-otp', verifyUserEmail);
-router.post('/auth/request-password-reset-otp', requestPasswordResetOtp);
-router.post('/auth/reset-password-with-otp', resetUserPasswordWithOtp);
+router.post('/auth/register', register);
+router.post('/auth/verify-email', verifyEmail);
+router.post('/auth/login', login);
+router.post('/auth/verify-loginOtp', verifyLoginOtp);
+
+// router.post('/auth/request-password-reset-otp', requestPasswordResetOtp);
+// router.post('/auth/reset-password-with-otp', resetUserPasswordWithOtp);
 
 
 

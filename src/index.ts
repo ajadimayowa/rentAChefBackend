@@ -4,7 +4,7 @@ import cors from 'cors';
 import connectDB from './config/db';
 import morgan from 'morgan';
 
-import authRoutes from './routes/auth.routes';
+import authRoutes from './routes/auth/auth.routes'
 import categoryRoutes from './routes/category/category.routes';
 import sliderRoutes from './routes/slider/slider.routes';
 import homeRoutes from './routes/homePage/homePage.route';
