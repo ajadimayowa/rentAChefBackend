@@ -29,6 +29,8 @@ const sendMail = (userEmail_1, subject_1, html_1, ...args_1) => __awaiter(void 0
     const transporter = nodemailer_1.default.createTransport({
         host: process.env.BREVO_SMTP_HOST, // Brevo SMTP host
         port: parseInt('587'), // Use 587 for TLS
+        // port: 465,
+        // secure: true, // SSL
         auth: {
             user: process.env.BREVO_USERNAME, // Your Brevo SMTP username (API key)
             pass: process.env.BREVO_PASSWORD // Your Brevo API key (same as username)
