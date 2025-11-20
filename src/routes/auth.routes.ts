@@ -1,8 +1,8 @@
 import { Router } from 'express';
 // import { register, login } from '../controllers/auth.controller';
 
-import { verifyToken } from '../../middleware/auth.middleware';
-import { login, register, verifyEmail, verifyLoginOtp } from '../../controllers/chefAuthControllers/auth.controller';
+import { verifyToken } from '../middleware/auth.middleware';
+import { login, register, verifyEmail, verifyLoginOtp } from '../controllers/chefAuthControllers/auth.controller';
 
 const router = Router();
 

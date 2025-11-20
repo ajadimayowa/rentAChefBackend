@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import Customer from '../models/Customer';
+import Customer from '../models/User.model';
 
 
 interface JwtPayload {
