@@ -7,6 +7,7 @@ import jwt from 'jsonwebtoken';
 import { generateOtp } from '../../utils/otpUtils';
 import { sendUserPasswordResetOtpEmail } from '../../services/email/ogasela/userLoginOtpEmailNotifs';
 import { sendEmailVerificationOtp, sendLoginOtpEmail } from '../../services/email/rentAChef/usersEmailNotifs';
+import Chef from '../../models/Chef';
 
 
 export const register = async (req: Request, res: Response): Promise<any> => {
@@ -258,6 +259,81 @@ export const verifyLoginOtp = async (req: Request, res: Response): Promise<any> 
   }
 };
 
+export const chefLogin = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const { email, password } = req.body;
+
+    // 1. Validate input
+    if (!email || !password) {
+      return res.status(400).json({
+        message: "Email and password are required",
+      });
+    }
+
+    // 2. Find chef by email
+    const chef = await Chef.findOne({ email });
+
+    if (!chef) {
+      return res.status(404).json({
+        message: "Chef not found",
+      });
+    }
+
+    // 3. Check if chef is active
+    if (!chef.isActive) {
+      return res.status(403).json({
+        message: "Your account has been disabled. Contact admin.",
+      });
+    }
+
+    // 4. Check if password exists
+    if (!chef.password) {
+      return res.status(403).json({
+        message: "Password not set. Contact admin.",
+      });
+    }
+
+    // 5. Compare passwords
+    const isMatch = await bcrypt.compare(password, chef.password);
+
+    if (!isMatch) {
+      return res.status(401).json({
+        message: "Invalid login credentials",
+      });
+    }
+
+    // 6. Generate JWT
+    const token = jwt.sign(
+      {
+        id: chef._id,
+        role: "chef",
+        email: chef.email,
+      },
+      process.env.JWT_SECRET as string,
+      { expiresIn: "7d" }
+    );
+
+    // 7. Send response
+    res.status(200).json({
+      message: "Login successful",
+      token,
+      chef: {
+        id: chef._id,
+        staffId: chef.staffId,
+        name: chef.name,
+        email: chef.email,
+        isPasswordUpdated: chef.isPasswordUpdated,
+      },
+    });
+
+  } catch (error) {
+    console.error("Chef Login Error:", error);
+
+    res.status(500).json({
+      message: "Unable to login at the moment",
+    });
+  }
+};
 
 export const me = async (req: Request, res: Response) => {
   const user = (req as any).user;

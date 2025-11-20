@@ -10,6 +10,7 @@ export interface IChef extends Document {
   profilePic?: string;
   menus: Types.ObjectId[];
   password?: string | null;
+  isPasswordUpdated: boolean;
   isActive: boolean;
   createdAt: Date;
 }
@@ -24,8 +25,20 @@ const ChefSchema = new Schema<IChef>({
   profilePic: { type: String },
   menus: [{ type: Schema.Types.ObjectId, ref: "Menu" }],
   password: { type: String, default: null },
+  isPasswordUpdated: { type: Boolean, default: false },
   isActive: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now },
-});
+},{
+    timestamps: true,
+    toJSON: {
+      virtuals: true,
+      versionKey: false,
+      transform: function (_doc, ret: any) {
+        ret.id = ret._id.toString();
+        delete ret._id;
+        return ret;
+      },
+    },
+  });
 
 export default model<IChef>("Chef", ChefSchema);
