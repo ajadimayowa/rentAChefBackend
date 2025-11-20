@@ -6,6 +6,7 @@ import morgan from 'morgan';
 
 import authRoutes from './routes/auth.routes'
 import chefRoutes from './routes/chef.route'
+import menuRoutes from './routes/menu.routes'
 
 
 dotenv.config();
@@ -32,6 +33,7 @@ const apiPrefix = '/api/v1/';
 // Routes
 app.use(apiPrefix, authRoutes);
 app.use(apiPrefix, chefRoutes);
+app.use(apiPrefix, menuRoutes);
 
 
 
