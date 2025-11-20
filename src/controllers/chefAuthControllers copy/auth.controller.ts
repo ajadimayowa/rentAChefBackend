@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { validationResult } from 'express-validator';
 // import User from '../models/User';
-import UserModel from '../../models/User.model';
+import Customer from '../../models/User.model';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { generateOtp } from '../../utils/otpUtils';
@@ -18,14 +18,14 @@ export const register = async (req: Request, res: Response): Promise<any> => {
   }
   const formatedEmail = email.trim().toLowerCase()
   try {
-    const existing = await UserModel.findOne({ formatedEmail });
+    const existing = await Customer.findOne({ formatedEmail });
     if (existing) {return res.status(400).json({success:false, message: 'A user with this email already exist.' });}
 
     let firstName = fullName.split(' ')[0]
     const hashed = await bcrypt.hash(password, 10);
     const isAdmin = req.body.adminSecret === process.env.ADMIN_SECRET;
     const emailVerificationOtp = generateOtp()
-    const user = await UserModel.create({ email: formatedEmail, phone: phoneNumber, emailVerificationOtp, password: hashed, fullName,firstName, isAdmin });
+    const user = await Customer.create({ email: formatedEmail, phone: phoneNumber, emailVerificationOtp, password: hashed, fullName,firstName, isAdmin });
 
     console.log({ seeEmailVerOtp: emailVerificationOtp })
     //  await  sendEmailVerificationOtp({
@@ -58,7 +58,7 @@ export const verifyEmail = async (req: Request, res: Response): Promise<any> => 
     }
 
     // Find the customer
-    const customer = await UserModel.findOne({ email: email.toLowerCase() });
+    const customer = await Customer.findOne({ email: email.toLowerCase() });
 
     if (!customer) {
       return res.status(404).json({
@@ -120,7 +120,7 @@ export const login = async (req: Request, res: Response): Promise<any> => {
     const normalizedEmail = email.trim().toLowerCase();
 
     // ✅ Fix: Query should use `email`, not `{ normalizedEmail }`
-    const user = await UserModel.findOne({ email: normalizedEmail });
+    const user = await Customer.findOne({ email: normalizedEmail });
 
     // Prevent timing attacks: always run bcrypt.compare
     const dummyHash = "$2b$10$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
@@ -193,7 +193,7 @@ export const verifyLoginOtp = async (req: Request, res: Response): Promise<any> 
     }
 
     // Find the customer
-    const customer = await UserModel.findOne({ email: email.trim().toLowerCase() });
+    const customer = await Customer.findOne({ email: email.trim().toLowerCase() });
 
     if (!customer) {
       return res.status(404).json({

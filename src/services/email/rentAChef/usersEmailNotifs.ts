@@ -58,7 +58,7 @@ const sendEmailVerificationOtp = async (creatorData: CreatorEmailData) => {
     },
   ];
   try {
-    await sendMail(email, subject, html, remoteImages);
+    await sendMail({userEmail:email, subject, html, remoteImages});
     console.log('email sent successfully!');
   } catch (error) {
     console.error('Error email:', error);
@@ -95,7 +95,7 @@ const sendLoginOtpEmail = async (creatorData: ILoginOtp) => {
     },
   ];
   try {
-    await sendMail(email, subject, html, remoteImages);
+    await sendMail({userEmail:email, subject, html, remoteImages});
     console.log('email sent successfully!');
   } catch (error) {
     console.error('Error email:', error);
@@ -132,7 +132,7 @@ const sendRegistrationNotificationEmail2 = async (creatorData: CreatorNotificati
     },
   ];
   try {
-    await sendMail(email, subject, html, remoteImages);
+    await sendMail({userEmail:email, subject, html, remoteImages});
     console.log('email sent successfully!');
   } catch (error) {
     console.error('Error email:', error);
