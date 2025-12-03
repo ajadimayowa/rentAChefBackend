@@ -33,5 +33,5 @@ const createUpload = (folder) => (0, multer_1.default)({
 });
 exports.createUpload = createUpload;
 // ✅ Export for ads (images folder)
-exports.uploadAdImages = (0, exports.createUpload)("images/product-pictures/");
+exports.uploadAdImages = (0, exports.createUpload)("images/profile-pictures/");
 exports.default = exports.uploadAdImages;

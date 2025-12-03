@@ -2,9 +2,12 @@ import { Request, Response } from "express";
 import Chef from "../models/Chef";
 import mongoose from "mongoose";
 import bcrypt from 'bcryptjs';
+import jwt from "jsonwebtoken";
+import dotenv from "dotenv";
 
 // ✅ Create Chef (ADMIN only)
 export const createChef = async (req: Request, res: Response): Promise<any> => {
+    const chefPic = (req.file as any);
     try {
         const {
             staffId,
@@ -20,6 +23,9 @@ export const createChef = async (req: Request, res: Response): Promise<any> => {
             defaultPassword
         } = req.body;
 
+        console.log({
+            adminSent:req?.body
+        })
         if (!staffId || !name || !email || !location|| !state) {
             return res.status(400).json({ message: "staffId, location,state, phone number, name & email are required" });
         }
@@ -43,10 +49,11 @@ export const createChef = async (req: Request, res: Response): Promise<any> => {
             gender,
             email,
             bio,
-            specialties,
+            specialties : JSON.parse(req.body.specialties),
             location,
             state,
             stateId,
+            profilePic:chefPic.location,
             phoneNumber,
             password: hashedPassword,
             isActive: true,
@@ -60,7 +67,53 @@ export const createChef = async (req: Request, res: Response): Promise<any> => {
         });
 
     } catch (error) {
+        console.log(error)
        return res.status(500).json({ message: "Error creating chef", error });
+    }
+};
+
+export const loginChef = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const { email, password } = req.body;
+
+        if (!email || !password) {
+            return res.status(400).json({ message: "Email and password are required" });
+        }
+
+        const chef = await Chef.findOne({ email });
+
+        if (!chef) {
+            return res.status(404).json({ message: "Chef not found" });
+        }
+
+        const isMatch = await bcrypt.compare(password, chef.password as string);
+
+        if (!isMatch) {
+            return res.status(401).json({ message: "Invalid password" });
+        }
+
+        // Generate JWT token
+        const token = jwt.sign(
+            { id: chef._id, email: chef.email, staffId: chef.staffId },
+            process.env.JWT_SECRET || "your_jwt_secret",
+            { expiresIn: "7d" }
+        );
+
+        return res.status(200).json({
+            message: "Login successful",
+            token,
+            chef: {
+                id: chef._id,
+                staffId: chef.staffId,
+                name: chef.name,
+                email: chef.email,
+                profilePic: chef.profilePic,
+                isActive: chef.isActive
+            }
+        });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ message: "Error logging in chef", error });
     }
 };
 

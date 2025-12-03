@@ -11,14 +11,14 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.isAdmin = void 0;
 const isAdmin = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    const adminSecrete = process.env.ADMIN_SECRET;
-    // console.log({seeSec:adminSecrete})
-    const { adminPass } = req.body;
-    // console.log({seePass:adminPass})
-    // if (adminPass !==process.env.ADMIN_SECRET) {
-    //   return res.status(401).json({ message: "Not authenticated" });
-    // }
-    if (adminPass != adminSecrete) {
+    var _a;
+    const adminSecret = process.env.ADMIN_SECRET;
+    const adminPass = (_a = req.body) === null || _a === void 0 ? void 0 : _a.adminPass;
+    console.log({ see: adminPass });
+    if (!adminPass) {
+        return res.status(400).json({ message: "adminPass missing from request body" });
+    }
+    if (adminPass !== adminSecret) {
         return res.status(403).json({ message: "Access denied. Admin only" });
     }
     next();
