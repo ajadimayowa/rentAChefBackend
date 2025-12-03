@@ -29,9 +29,14 @@ const createUpload = (folder) => (0, multer_1.default)({
             const fileName = `${Date.now()}-${file.originalname}`;
             cb(null, `${folder}/${fileName}`);
         },
+        contentType: (req, file, cb) => {
+            cb(null, file.mimetype); // ensure proper Content-Type
+        },
+        contentDisposition: "inline", // ensures it displays in browser / Image component
+        acl: "public-read", // make it publicly accessible
     }),
 });
 exports.createUpload = createUpload;
-// ✅ Export for ads (images folder)
-exports.uploadAdImages = (0, exports.createUpload)("images/profile-pictures/");
+// ✅ Export for profile pictures
+exports.uploadAdImages = (0, exports.createUpload)("images/profile-pictures");
 exports.default = exports.uploadAdImages;

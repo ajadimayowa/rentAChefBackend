@@ -29,10 +29,15 @@ export const createUpload = (folder: string) =>
         const fileName = `${Date.now()}-${file.originalname}`;
         cb(null, `${folder}/${fileName}`);
       },
+      contentType: (req, file, cb) => {
+        cb(null, file.mimetype); // ensure proper Content-Type
+      },
+      contentDisposition: "inline", // ensures it displays in browser / Image component
+      acl: "public-read", // make it publicly accessible
     }),
   });
 
-// ✅ Export for ads (images folder)
-export const uploadAdImages = createUpload("images/profile-pictures/");
+// ✅ Export for profile pictures
+export const uploadAdImages = createUpload("images/profile-pictures");
 
 export default uploadAdImages;
