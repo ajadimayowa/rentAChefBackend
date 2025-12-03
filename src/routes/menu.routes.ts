@@ -13,10 +13,10 @@ import {
 
 const router = express.Router();
 
-router.post("/", createMenu);
-router.get("/", getAllMenus);
-router.get("/:id", getSingleMenu);
-router.put("/:id", updateMenu);
-router.delete("/:id", deleteMenu);
+router.post("/menu/create", createMenu);
+router.get("/menu/all", getAllMenus);
+router.get("menu/:id", getSingleMenu);
+router.put("menu/:id", updateMenu);
+router.delete("menu/:id", deleteMenu);
 
 export default router;

@@ -9,16 +9,19 @@ export const createChef = async (req: Request, res: Response): Promise<any> => {
         const {
             staffId,
             name,
+            gender,
             email,
             bio,
+            phoneNumber,
             specialties,
             location,
-            profilePic,
+            state,
+            stateId,
             defaultPassword
         } = req.body;
 
-        if (!staffId || !name || !email) {
-            return res.status(400).json({ message: "staffId, name & email are required" });
+        if (!staffId || !name || !email || !location|| !state) {
+            return res.status(400).json({ message: "staffId, location,state, phone number, name & email are required" });
         }
 
         const exists = await Chef.findOne({
@@ -37,24 +40,27 @@ export const createChef = async (req: Request, res: Response): Promise<any> => {
         const chef = await Chef.create({
             staffId,
             name,
+            gender,
             email,
             bio,
             specialties,
             location,
-            profilePic,
+            state,
+            stateId,
+            phoneNumber,
             password: hashedPassword,
             isActive: true,
             isPasswordUpdated: false
         });
 
-        res.status(201).json({
+       return res.status(201).json({
             message: "Chef created successfully",
             defaultPassword: pass, // Send to admin to give the chef
             chef
         });
 
     } catch (error) {
-        res.status(500).json({ message: "Error creating chef", error });
+       return res.status(500).json({ message: "Error creating chef", error });
     }
 };
 
@@ -62,14 +68,14 @@ export const createChef = async (req: Request, res: Response): Promise<any> => {
 // ✅ Get all chefs (ANY authenticated user)
 export const getAllChefs = async (req: Request, res: Response): Promise<any> => {
     try {
-        const chefs = await Chef.find()
+        const chefs = await Chef.find().select('-password')
             // .populate("menus")
             // .sort({ createdAt: -1 });
 
-        res.status(200).json({ success: true, payload: chefs });
+        return res.status(200).json({ success: true, payload: chefs });
 
     } catch (error) {
-        res.status(500).json({ message: "Error fetching chefs", error });
+        return res.status(500).json({success:false, message: "Error fetching chefs", payload:error });
     }
 };
 

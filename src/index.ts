@@ -4,6 +4,7 @@ import cors from 'cors';
 import connectDB from './config/db';
 import morgan from 'morgan';
 
+import stateRoutes from './routes/stateRoutes'
 import authRoutes from './routes/auth.routes'
 import chefRoutes from './routes/chef.route'
 import menuRoutes from './routes/menu.routes'
@@ -34,6 +35,7 @@ const apiPrefix = '/api/v1/';
 app.use(apiPrefix, authRoutes);
 app.use(apiPrefix, chefRoutes);
 app.use(apiPrefix, menuRoutes);
+app.use(apiPrefix, stateRoutes);
 
 
 

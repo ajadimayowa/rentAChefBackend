@@ -1,15 +1,15 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
-// import { register, login } from '../controllers/auth.controller';
-const user_1 = require("../controllers/auth/user");
+const auth_controller_1 = require("../controllers/chefAuthControllers/auth.controller");
 const router = (0, express_1.Router)();
-router.post('/auth/register', user_1.createUser);
-router.post('/auth/login', user_1.loginUser);
-router.post('/auth/verify-otp', user_1.verifyLoginOtp);
-router.post('/auth/verify-email-otp', user_1.verifyUserEmail);
-router.post('/auth/request-password-reset-otp', user_1.requestPasswordResetOtp);
-router.post('/auth/reset-password-with-otp', user_1.resetUserPasswordWithOtp);
+router.post('/auth/register', auth_controller_1.register);
+router.post('/auth/verify-email', auth_controller_1.verifyEmail);
+router.post('/auth/login', auth_controller_1.login);
+router.post('/auth/verify-loginOtp', auth_controller_1.verifyLoginOtp);
+router.post('/auth/chef/login', auth_controller_1.chefLogin);
+// router.post('/auth/request-password-reset-otp', requestPasswordResetOtp);
+// router.post('/auth/reset-password-with-otp', resetUserPasswordWithOtp);
 // router.post('/register-staff', (req, res, next) => {
 //   Promise.resolve(adminRegisterStaff(req, res)).catch(next);
 // });

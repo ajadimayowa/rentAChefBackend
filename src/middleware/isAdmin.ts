@@ -7,12 +7,18 @@ interface AuthRequest extends Request {
   };
 }
 
-export const isAdmin = async (req: AuthRequest, res: Response, next: NextFunction):Promise<any> => {
-  if (!req.user) {
-    return res.status(401).json({ message: "Not authenticated" });
-  }
+export const isAdmin = async (req: Request, res: Response, next: NextFunction):Promise<any> => {
+  const adminSecrete=process.env.ADMIN_SECRET;
+  // console.log({seeSec:adminSecrete})
 
-  if (req.user.role !== "admin") {
+  const {adminPass} = req.body
+
+  // console.log({seePass:adminPass})
+  // if (adminPass !==process.env.ADMIN_SECRET) {
+  //   return res.status(401).json({ message: "Not authenticated" });
+  // }
+
+  if (adminPass!=adminSecrete) {
     return res.status(403).json({ message: "Access denied. Admin only" });
   }
 

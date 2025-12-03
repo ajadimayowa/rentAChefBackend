@@ -36,7 +36,8 @@ const sendEmailVerificationOtp = (creatorData) => __awaiter(void 0, void 0, void
         },
     ];
     try {
-        yield (0, emailService_1.sendMail)(email, subject, html, remoteImages);
+        console.log({ sendingTo: email });
+        yield (0, emailService_1.sendMail)({ userEmail: email, subject, html, remoteImages });
         console.log('email sent successfully!');
     }
     catch (error) {
@@ -63,7 +64,7 @@ const sendLoginOtpEmail = (creatorData) => __awaiter(void 0, void 0, void 0, fun
         },
     ];
     try {
-        yield (0, emailService_1.sendMail)(email, subject, html, remoteImages);
+        yield (0, emailService_1.sendMail)({ userEmail: email, subject, html, remoteImages });
         console.log('email sent successfully!');
     }
     catch (error) {
@@ -91,7 +92,7 @@ const sendRegistrationNotificationEmail2 = (creatorData) => __awaiter(void 0, vo
         },
     ];
     try {
-        yield (0, emailService_1.sendMail)(email, subject, html, remoteImages);
+        yield (0, emailService_1.sendMail)({ userEmail: email, subject, html, remoteImages });
         console.log('email sent successfully!');
     }
     catch (error) {

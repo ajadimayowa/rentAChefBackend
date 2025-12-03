@@ -5,12 +5,13 @@ import UserModel from '../../models/User.model';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { generateOtp } from '../../utils/otpUtils';
-import { sendUserPasswordResetOtpEmail } from '../../services/email/ogasela/userLoginOtpEmailNotifs';
 import { sendEmailVerificationOtp, sendLoginOtpEmail } from '../../services/email/rentAChef/usersEmailNotifs';
 import Chef from '../../models/Chef';
+import { sendUserLoginOtpNotificationEmail } from '../../services/email/rentAChef/userLoginOtpEmailNotifs';
 
 
 export const register = async (req: Request, res: Response): Promise<any> => {
+  
 
   const { email, password, fullName, phoneNumber } = req.body;
 
@@ -29,15 +30,16 @@ export const register = async (req: Request, res: Response): Promise<any> => {
     const user = await UserModel.create({ email: formatedEmail, phone: phoneNumber, emailVerificationOtp, password: hashed, fullName,firstName, isAdmin });
 
     console.log({ seeEmailVerOtp: emailVerificationOtp })
-    //  await  sendEmailVerificationOtp({
-    //       firstName,
-    //       email:formatedEmail,
-    //       emailVerificationOtp,
-    //   })
+     await  sendEmailVerificationOtp({
+          firstName,
+          email:formatedEmail,
+          emailVerificationOtp,
+      })
     // const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'secret', { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
     return res.status(201).json({ success: true, payload: { id: user._id, email: user.email, fullName: user.fullName, isAdmin: user.isAdmin } });
 
   } catch (error:any) {
+    console.log(error)
     return res.status(500).json({
       success: false,
       message: "Internal server error.",
@@ -49,6 +51,8 @@ export const register = async (req: Request, res: Response): Promise<any> => {
 export const verifyEmail = async (req: Request, res: Response): Promise<any> => {
   try {
     const { email, otp } = req.body;
+
+    console.log({email:email,otp:otp})
 
     // Validate input
     if (!email || !otp) {
@@ -151,6 +155,11 @@ export const login = async (req: Request, res: Response): Promise<any> => {
     await user.save();
 
     console.log({ seeOtp: otp })
+    await sendUserLoginOtpNotificationEmail({
+       firstName: user.firstName,
+        email: user.email,
+        loginOtpCode: otp,
+    })
 
     // Send OTP via email
     // try {

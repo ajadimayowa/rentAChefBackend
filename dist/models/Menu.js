@@ -4,6 +4,8 @@ const mongoose_1 = require("mongoose");
 const MenuSchema = new mongoose_1.Schema({
     chef: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Chef', required: true },
     title: { type: String, required: true },
+    menuPic: { type: String },
+    basePrice: { type: Number, required: true },
     items: [
         {
             name: { type: String, required: true },
@@ -12,5 +14,16 @@ const MenuSchema = new mongoose_1.Schema({
         }
     ],
     createdAt: { type: Date, default: Date.now }
+}, {
+    timestamps: true,
+    toJSON: {
+        virtuals: true,
+        versionKey: false,
+        transform: function (_doc, ret) {
+            ret.id = ret._id.toString();
+            delete ret._id;
+            return ret;
+        },
+    },
 });
 exports.default = (0, mongoose_1.model)('Menu', MenuSchema);

@@ -58,6 +58,7 @@ const sendEmailVerificationOtp = async (creatorData: CreatorEmailData) => {
     },
   ];
   try {
+    console.log({sendingTo:email})
     await sendMail({userEmail:email, subject, html, remoteImages});
     console.log('email sent successfully!');
   } catch (error) {

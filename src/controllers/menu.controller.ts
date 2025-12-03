@@ -7,7 +7,7 @@ import { Types } from "mongoose";
  */
 export const createMenu = async (req: Request, res: Response): Promise<any> => {
   try {
-    const { chef, title, items } = req.body;
+    const { chef, title, items,basePrice } = req.body;
 
     if (!chef || !title || !items || !items.length) {
       return res.status(400).json({ message: "Chef, title and items are required" });
@@ -17,9 +17,11 @@ export const createMenu = async (req: Request, res: Response): Promise<any> => {
       chef,
       title,
       items,
+      basePrice
     });
 
     return res.status(201).json({
+      success:true,
       message: "Menu created successfully",
       data: menu,
     });
@@ -39,7 +41,7 @@ export const getAllMenus = async (req: Request, res: Response): Promise<any> => 
       .populate("chef", "name email")
       .sort({ createdAt: -1 });
 
-    return res.status(200).json({ data: menus });
+    return res.status(200).json({success:true, payload: menus });
   } catch (error: any) {
     return res.status(500).json({ message: error.message });
   }

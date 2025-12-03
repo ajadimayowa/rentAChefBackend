@@ -5,8 +5,6 @@ import Customer from '../../models/User.model';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { generateOtp } from '../../utils/otpUtils';
-import { sendUserPasswordResetOtpEmail } from '../../services/email/ogasela/userLoginOtpEmailNotifs';
-import { sendEmailVerificationOtp, sendLoginOtpEmail } from '../../services/email/rentAChef/usersEmailNotifs';
 
 
 export const register = async (req: Request, res: Response): Promise<any> => {

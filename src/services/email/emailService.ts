@@ -79,7 +79,7 @@ export const sendMail = async ({
   });
 
   const mailOptions = {
-    from: '"Olive From Ogasela" <hello@ogasela.com>',
+    from: '"RentAChef" <support@floatsolutionhub.com>',
     to: userEmail,
     subject,
     html,

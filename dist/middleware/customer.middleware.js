@@ -14,7 +14,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.auth = void 0;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
-const Customer_1 = __importDefault(require("../models/Customer"));
+const User_model_1 = __importDefault(require("../models/User.model"));
 const auth = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     const authHeader = req.headers.authorization;
     if (!(authHeader === null || authHeader === void 0 ? void 0 : authHeader.startsWith('Bearer ')))
@@ -23,7 +23,7 @@ const auth = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () 
     try {
         const secret = process.env.JWT_SECRET || 'secret';
         const payload = jsonwebtoken_1.default.verify(token, secret);
-        const user = yield Customer_1.default.findById(payload.id).select('-password');
+        const user = yield User_model_1.default.findById(payload.id).select('-password');
         if (!user)
             return res.status(401).json({ message: 'Unauthorized' });
         req.user = user;

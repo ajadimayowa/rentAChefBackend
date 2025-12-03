@@ -12,15 +12,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.me = exports.chefLogin = exports.verifyLoginOtp = exports.login = exports.verifyEmail = exports.register = void 0;
+exports.me = exports.verifyLoginOtp = exports.login = exports.verifyEmail = exports.register = void 0;
 // import User from '../models/User';
 const User_model_1 = __importDefault(require("../../models/User.model"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const otpUtils_1 = require("../../utils/otpUtils");
-const usersEmailNotifs_1 = require("../../services/email/rentAChef/usersEmailNotifs");
-const Chef_1 = __importDefault(require("../../models/Chef"));
-const userLoginOtpEmailNotifs_1 = require("../../services/email/rentAChef/userLoginOtpEmailNotifs");
 const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { email, password, fullName, phoneNumber } = req.body;
     if (!email || !password || !fullName || !phoneNumber) {
@@ -38,16 +35,15 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         const emailVerificationOtp = (0, otpUtils_1.generateOtp)();
         const user = yield User_model_1.default.create({ email: formatedEmail, phone: phoneNumber, emailVerificationOtp, password: hashed, fullName, firstName, isAdmin });
         console.log({ seeEmailVerOtp: emailVerificationOtp });
-        yield (0, usersEmailNotifs_1.sendEmailVerificationOtp)({
-            firstName,
-            email: formatedEmail,
-            emailVerificationOtp,
-        });
+        //  await  sendEmailVerificationOtp({
+        //       firstName,
+        //       email:formatedEmail,
+        //       emailVerificationOtp,
+        //   })
         // const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'secret', { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
         return res.status(201).json({ success: true, payload: { id: user._id, email: user.email, fullName: user.fullName, isAdmin: user.isAdmin } });
     }
     catch (error) {
-        console.log(error);
         return res.status(500).json({
             success: false,
             message: "Internal server error.",
@@ -58,7 +54,6 @@ exports.register = register;
 const verifyEmail = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { email, otp } = req.body;
-        console.log({ email: email, otp: otp });
         // Validate input
         if (!email || !otp) {
             return res.status(400).json({
@@ -144,11 +139,6 @@ const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         user.loginOtpExpires = otpExpires;
         yield user.save();
         console.log({ seeOtp: otp });
-        yield (0, userLoginOtpEmailNotifs_1.sendUserLoginOtpNotificationEmail)({
-            firstName: user.firstName,
-            email: user.email,
-            loginOtpCode: otp,
-        });
         // Send OTP via email
         // try {
         //   await sendLoginOtpEmail({
@@ -244,68 +234,6 @@ const verifyLoginOtp = (req, res) => __awaiter(void 0, void 0, void 0, function*
     }
 });
 exports.verifyLoginOtp = verifyLoginOtp;
-const chefLogin = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { email, password } = req.body;
-        // 1. Validate input
-        if (!email || !password) {
-            return res.status(400).json({
-                message: "Email and password are required",
-            });
-        }
-        // 2. Find chef by email
-        const chef = yield Chef_1.default.findOne({ email });
-        if (!chef) {
-            return res.status(404).json({
-                message: "Chef not found",
-            });
-        }
-        // 3. Check if chef is active
-        if (!chef.isActive) {
-            return res.status(403).json({
-                message: "Your account has been disabled. Contact admin.",
-            });
-        }
-        // 4. Check if password exists
-        if (!chef.password) {
-            return res.status(403).json({
-                message: "Password not set. Contact admin.",
-            });
-        }
-        // 5. Compare passwords
-        const isMatch = yield bcryptjs_1.default.compare(password, chef.password);
-        if (!isMatch) {
-            return res.status(401).json({
-                message: "Invalid login credentials",
-            });
-        }
-        // 6. Generate JWT
-        const token = jsonwebtoken_1.default.sign({
-            id: chef._id,
-            role: "chef",
-            email: chef.email,
-        }, process.env.JWT_SECRET, { expiresIn: "7d" });
-        // 7. Send response
-        res.status(200).json({
-            message: "Login successful",
-            token,
-            chef: {
-                id: chef._id,
-                staffId: chef.staffId,
-                name: chef.name,
-                email: chef.email,
-                isPasswordUpdated: chef.isPasswordUpdated,
-            },
-        });
-    }
-    catch (error) {
-        console.error("Chef Login Error:", error);
-        res.status(500).json({
-            message: "Unable to login at the moment",
-        });
-    }
-});
-exports.chefLogin = chefLogin;
 const me = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const user = req.user;
     if (!user)
