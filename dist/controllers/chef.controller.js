@@ -12,14 +12,19 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteChef = exports.disableChef = exports.updateChef = exports.getChefById = exports.getAllChefs = exports.createChef = void 0;
+exports.deleteChef = exports.disableChef = exports.updateChef = exports.getChefById = exports.getAllChefs = exports.loginChef = exports.createChef = void 0;
 const Chef_1 = __importDefault(require("../models/Chef"));
 const mongoose_1 = __importDefault(require("mongoose"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
+const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 // ✅ Create Chef (ADMIN only)
 const createChef = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const chefPic = req.file;
     try {
         const { staffId, name, gender, email, bio, phoneNumber, specialties, location, state, stateId, defaultPassword } = req.body;
+        console.log({
+            adminSent: req === null || req === void 0 ? void 0 : req.body
+        });
         if (!staffId || !name || !email || !location || !state) {
             return res.status(400).json({ message: "staffId, location,state, phone number, name & email are required" });
         }
@@ -38,10 +43,11 @@ const createChef = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             gender,
             email,
             bio,
-            specialties,
+            specialties: JSON.parse(req.body.specialties),
             location,
             state,
             stateId,
+            profilePic: chefPic.location,
             phoneNumber,
             password: hashedPassword,
             isActive: true,
@@ -54,10 +60,46 @@ const createChef = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         });
     }
     catch (error) {
+        console.log(error);
         return res.status(500).json({ message: "Error creating chef", error });
     }
 });
 exports.createChef = createChef;
+const loginChef = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { email, password } = req.body;
+        if (!email || !password) {
+            return res.status(400).json({ message: "Email and password are required" });
+        }
+        const chef = yield Chef_1.default.findOne({ email });
+        if (!chef) {
+            return res.status(404).json({ message: "Chef not found" });
+        }
+        const isMatch = yield bcryptjs_1.default.compare(password, chef.password);
+        if (!isMatch) {
+            return res.status(401).json({ message: "Invalid password" });
+        }
+        // Generate JWT token
+        const token = jsonwebtoken_1.default.sign({ id: chef._id, email: chef.email, staffId: chef.staffId }, process.env.JWT_SECRET || "your_jwt_secret", { expiresIn: "7d" });
+        return res.status(200).json({
+            message: "Login successful",
+            token,
+            chef: {
+                id: chef._id,
+                staffId: chef.staffId,
+                name: chef.name,
+                email: chef.email,
+                profilePic: chef.profilePic,
+                isActive: chef.isActive
+            }
+        });
+    }
+    catch (error) {
+        console.error(error);
+        return res.status(500).json({ message: "Error logging in chef", error });
+    }
+});
+exports.loginChef = loginChef;
 // ✅ Get all chefs (ANY authenticated user)
 const getAllChefs = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {

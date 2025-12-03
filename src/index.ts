@@ -20,6 +20,7 @@ connectDB().catch((err) => {
 
 const app = express();
 
+
 // Middlewares
 if (process.env.NODE_ENV === 'development') app.use(morgan('dev'));
 
@@ -28,6 +29,7 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 const apiPrefix = '/api/v1/';
 

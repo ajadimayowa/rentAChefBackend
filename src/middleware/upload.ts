@@ -33,6 +33,6 @@ export const createUpload = (folder: string) =>
   });
 
 // ✅ Export for ads (images folder)
-export const uploadAdImages = createUpload("images/product-pictures/");
+export const uploadAdImages = createUpload("images/profile-pictures/");
 
 export default uploadAdImages;
