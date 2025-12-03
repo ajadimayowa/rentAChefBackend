@@ -19,7 +19,7 @@ const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const sendUserLoginOtpNotificationEmail = (creatorData) => __awaiter(void 0, void 0, void 0, function* () {
     const { firstName, email, loginOtpCode } = creatorData;
-    const templatePath = path_1.default.join(process.cwd(), 'src', 'services', 'email', 'emailTemps', 'ogasela', 'LoginOtpEmailTemplate.hbs');
+    const templatePath = path_1.default.join(process.cwd(), 'src', 'services', 'email', 'emailTemps', 'rentAChef', 'LoginOtpEmailTemplate.hbs');
     const templateSource = fs_1.default.readFileSync(templatePath, 'utf-8');
     // Compile the Handlebars templates
     const template = handlebars_1.default.compile(templateSource);
@@ -27,16 +27,16 @@ const sendUserLoginOtpNotificationEmail = (creatorData) => __awaiter(void 0, voi
     const subject = 'Login Otp';
     const remoteImages = [
         {
-            url: 'https://ogasela-bucket.s3.eu-north-1.amazonaws.com/images/website-pictures/ogasela-icon.png',
+            url: 'https://rentachefdev.s3.eu-north-1.amazonaws.com/images/app-pictures/rentAChefLogoWhite.png',
             cid: 'logo',
         },
         {
-            url: 'https://ogasela-bucket.s3.eu-north-1.amazonaws.com/images/website-pictures/ogasela-footer.png',
+            url: 'https://rentachefdev.s3.eu-north-1.amazonaws.com/images/app-pictures/rentAChefEmailFooter.png',
             cid: 'footer',
         },
     ];
     try {
-        yield (0, emailService_1.sendMail)(email, subject, html, remoteImages);
+        yield (0, emailService_1.sendMail)({ userEmail: email, subject, html, remoteImages });
         console.log('email sent successfully!');
     }
     catch (error) {
@@ -63,7 +63,7 @@ const sendUserLoginNotificationEmail = (creatorData) => __awaiter(void 0, void 0
         },
     ];
     try {
-        yield (0, emailService_1.sendMail)(email, subject, html, remoteImages);
+        yield (0, emailService_1.sendMail)({ userEmail: email, subject, html, remoteImages });
         console.log('email sent successfully!');
     }
     catch (error) {
@@ -90,7 +90,7 @@ const sendUserPasswordResetNotificationEmail = (creatorData) => __awaiter(void 0
         },
     ];
     try {
-        yield (0, emailService_1.sendMail)(email, subject, html, remoteImages);
+        yield (0, emailService_1.sendMail)({ userEmail: email, subject, html, remoteImages });
         console.log('email sent successfully!');
     }
     catch (error) {
@@ -117,7 +117,7 @@ const sendUserPasswordResetOtpEmail = (creatorData) => __awaiter(void 0, void 0,
         },
     ];
     try {
-        yield (0, emailService_1.sendMail)(email, subject, html, remoteImages);
+        yield (0, emailService_1.sendMail)({ userEmail: email, subject, html, remoteImages });
         console.log('email sent successfully!');
     }
     catch (error) {

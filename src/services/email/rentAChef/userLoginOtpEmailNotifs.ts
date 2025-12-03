@@ -24,7 +24,7 @@ const sendUserLoginOtpNotificationEmail = async (creatorData: ILoginEmailData) =
     'services',
     'email',
     'emailTemps',
-    'ogasela',
+    'rentAChef',
     'LoginOtpEmailTemplate.hbs'
   );
 
@@ -35,16 +35,16 @@ const sendUserLoginOtpNotificationEmail = async (creatorData: ILoginEmailData) =
   const subject = 'Login Otp';
   const remoteImages = [
     {
-      url:'https://ogasela-bucket.s3.eu-north-1.amazonaws.com/images/website-pictures/ogasela-icon.png',
+      url:'https://rentachefdev.s3.eu-north-1.amazonaws.com/images/app-pictures/rentAChefLogoWhite.png',
       cid: 'logo',
     },
     {
-      url:'https://ogasela-bucket.s3.eu-north-1.amazonaws.com/images/website-pictures/ogasela-footer.png',
+      url:'https://rentachefdev.s3.eu-north-1.amazonaws.com/images/app-pictures/rentAChefEmailFooter.png',
       cid: 'footer',
     },
   ];
   try {
-    await sendMail(email, subject, html, remoteImages);
+    await sendMail({userEmail:email,subject, html, remoteImages});
     console.log('email sent successfully!');
   } catch (error) {
     console.error('Error email:', error);
@@ -80,7 +80,7 @@ const sendUserLoginNotificationEmail = async (creatorData: ILoginEmailData) => {
     },
   ];
   try {
-    await sendMail(email, subject, html, remoteImages);
+    await sendMail({userEmail:email,subject, html, remoteImages});
     console.log('email sent successfully!');
   } catch (error) {
     console.error('Error email:', error);
@@ -116,7 +116,7 @@ const sendUserPasswordResetNotificationEmail = async (creatorData: ILoginEmailDa
     },
   ];
   try {
-    await sendMail(email, subject, html, remoteImages);
+    await sendMail({userEmail:email,subject, html, remoteImages});
     console.log('email sent successfully!');
   } catch (error) {
     console.error('Error email:', error);
@@ -152,7 +152,7 @@ const sendUserPasswordResetOtpEmail = async (creatorData: ILoginEmailData) => {
     },
   ];
   try {
-    await sendMail(email, subject, html, remoteImages);
+    await sendMail({userEmail:email,subject, html, remoteImages});
     console.log('email sent successfully!');
   } catch (error) {
     console.error('Error email:', error);

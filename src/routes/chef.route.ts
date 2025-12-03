@@ -20,7 +20,7 @@ router.get("/chef/:id", getChefById);
 router.put("/chef/:id", updateChef);
 
 // Admin only
-router.post("/chef/register",createChef);
+router.post("/chef/register",isAdmin,createChef);
 router.patch("/chef/disable/:id", isAdmin, disableChef);
 router.delete("/chef/:id", isAdmin, deleteChef);
 

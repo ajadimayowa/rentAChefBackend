@@ -14,11 +14,16 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.sendMail = void 0;
 const nodemailer_1 = __importDefault(require("nodemailer"));
+const path_1 = __importDefault(require("path"));
 const axios_1 = __importDefault(require("axios"));
-const sendMail = (userEmail_1, subject_1, html_1, ...args_1) => __awaiter(void 0, [userEmail_1, subject_1, html_1, ...args_1], void 0, function* (userEmail, subject, html, remoteImages = []) {
-    const attachments = yield Promise.all(remoteImages.map((img) => __awaiter(void 0, void 0, void 0, function* () {
+const sendMail = (_a) => __awaiter(void 0, [_a], void 0, function* ({ userEmail, subject, html, remoteImages = [], localImages = [], retries = 3, retryDelayMs = 2000, }) {
+    const { SMTP_HOST, SMTP_USERNAME, SMTP_PASSWORD, SMTP_PORT } = process.env;
+    if (!SMTP_HOST || !SMTP_USERNAME || !SMTP_PASSWORD) {
+        throw new Error('SMTP credentials are not set in .env');
+    }
+    // Prepare remote attachments
+    const remoteAttachments = yield Promise.all(remoteImages.map((img) => __awaiter(void 0, void 0, void 0, function* () {
         const response = yield axios_1.default.get(img.url, { responseType: 'arraybuffer' });
-        // Guess filename from URL if not provided
         const fileNameFromURL = img.url.split('/').pop() || 'image.png';
         return {
             filename: img.filename || fileNameFromURL,
@@ -26,37 +31,49 @@ const sendMail = (userEmail_1, subject_1, html_1, ...args_1) => __awaiter(void 0
             cid: img.cid,
         };
     })));
+    // Prepare local attachments
+    const localAttachments = localImages.map((img) => ({
+        filename: img.filename || path_1.default.basename(img.path),
+        path: img.path,
+        cid: img.cid,
+    }));
+    const port = parseInt(SMTP_PORT || '587');
     const transporter = nodemailer_1.default.createTransport({
-        host: process.env.BREVO_SMTP_HOST, // Brevo SMTP host
-        port: parseInt('587'), // Use 587 for TLS
-        // port: 465,
-        // secure: true, // SSL
+        host: SMTP_HOST,
+        port,
+        secure: port === 465,
         auth: {
-            user: process.env.BREVO_USERNAME, // Your Brevo SMTP username (API key)
-            pass: process.env.BREVO_PASSWORD // Your Brevo API key (same as username)
+            user: SMTP_USERNAME,
+            pass: SMTP_PASSWORD,
         },
-        secure: false, // Use TLS
         requireTLS: true,
     });
-    const mailerOptions = {
-        from: '"Olive From Ogasela" <hello@floatsolutionhub.com>', // Sender address
-        to: userEmail, // Recipient's email address
-        subject: subject,
-        html: html,
-        attachments: attachments,
-        // attachments: [
-        //   {
-        //     filename: 'fsh-email-template-footer.png',
-        //     path: path.join(process.cwd(), 'src', 'assets', 'images', 'fsh-email-template-footer.png'),
-        //     cid: 'footerImage' // Use this CID in the HTML to reference the image
-        //   },
-        //   {
-        //     filename: 'fsh-logo.png',
-        //     path: path.join(process.cwd(), 'src', 'assets', 'images', 'fsh-logo.png'),
-        //     cid: 'logoImage' // Use this CID in the HTML to reference the image
-        //   }
-        //   ]
+    const mailOptions = {
+        from: '"RentAChef" <support@floatsolutionhub.com>',
+        to: userEmail,
+        subject,
+        html,
+        attachments: [...remoteAttachments, ...localAttachments],
     };
-    return transporter.sendMail(mailerOptions);
+    // --- Retry logic ---
+    let attempt = 0;
+    while (attempt < retries) {
+        try {
+            const info = yield transporter.sendMail(mailOptions);
+            console.log(`Email sent to ${userEmail}: ${info.messageId}`);
+            return info;
+        }
+        catch (error) {
+            attempt++;
+            console.error(`Attempt ${attempt} failed for ${userEmail}:`, error);
+            if (attempt < retries) {
+                console.log(`Retrying in ${retryDelayMs}ms...`);
+                yield new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+            }
+            else {
+                throw new Error(`Failed to send email to ${userEmail} after ${retries} attempts`);
+            }
+        }
+    }
 });
 exports.sendMail = sendMail;

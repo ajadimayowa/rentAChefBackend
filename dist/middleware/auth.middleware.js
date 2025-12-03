@@ -12,10 +12,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.isCreator = exports.isSuperAdmin = exports.verifyUserToken = exports.verifyRootAdminToken = exports.verifyToken = void 0;
+exports.isCreator = exports.isSuperAdmin = exports.verifyUserToken = exports.verifyToken = void 0;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
-const Staff_1 = __importDefault(require("../models/Staff"));
-const Creator_model_1 = require("../models/Creator.model");
 const User_model_1 = __importDefault(require("../models/User.model"));
 // export const verifyToken = async (req: Request, res: Response, next: NextFunction) => {
 //   const authHeader = req.headers.authorization;
@@ -40,7 +38,7 @@ const verifyToken = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
     try {
         const token = authHeader.split(' ')[1];
         const decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET);
-        const user = yield Staff_1.default.findById(decoded.id);
+        const user = yield User_model_1.default.findById(decoded.id);
         if (!user) {
             res.status(403).json({ msg: 'Invalid token' });
             return;
@@ -53,28 +51,26 @@ const verifyToken = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
     }
 });
 exports.verifyToken = verifyToken;
-const verifyRootAdminToken = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
-        res.status(401).json({ msg: 'No token provided' });
-        return;
-    }
-    try {
-        const token = authHeader.split(' ')[1];
-        const decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET);
-        const creator = yield Creator_model_1.Creator.findById(decoded.id);
-        if (!creator) {
-            res.status(403).json({ msg: 'Invalid token' });
-            return;
-        }
-        req.user = creator;
-        next(); // ✅ move on to controller
-    }
-    catch (err) {
-        res.status(401).json({ msg: 'Token failed' });
-    }
-});
-exports.verifyRootAdminToken = verifyRootAdminToken;
+// export const verifyRootAdminToken = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+//   const authHeader = req.headers.authorization;
+//   if (!authHeader) {
+//     res.status(401).json({ msg: 'No token provided' });
+//     return;
+//   }
+//   try {
+//     const token = authHeader.split(' ')[1];
+//     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
+//     const creator = await Creator.findById(decoded.id);
+//     if (!creator) {
+//       res.status(403).json({ msg: 'Invalid token' });
+//       return;
+//     }
+//     (req as any).user = creator;
+//     next(); // ✅ move on to controller
+//   } catch (err) {
+//     res.status(401).json({ msg: 'Token failed' });
+//   }
+// };
 const verifyUserToken = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     const authHeader = req.headers.authorization;
     if (!authHeader) {
