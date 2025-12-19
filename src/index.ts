@@ -6,6 +6,7 @@ import morgan from 'morgan';
 
 import stateRoutes from './routes/stateRoutes'
 import authRoutes from './routes/auth.routes'
+import adminRoutes from './routes/admin.routes'
 import chefRoutes from './routes/chef.route'
 import menuRoutes from './routes/menu.routes'
 
@@ -35,6 +36,7 @@ const apiPrefix = '/api/v1/';
 
 // Routes
 app.use(apiPrefix, authRoutes);
+app.use(apiPrefix, adminRoutes);
 app.use(apiPrefix, chefRoutes);
 app.use(apiPrefix, menuRoutes);
 app.use(apiPrefix, stateRoutes);

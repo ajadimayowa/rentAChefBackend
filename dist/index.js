@@ -10,6 +10,7 @@ const db_1 = __importDefault(require("./config/db"));
 const morgan_1 = __importDefault(require("morgan"));
 const stateRoutes_1 = __importDefault(require("./routes/stateRoutes"));
 const auth_routes_1 = __importDefault(require("./routes/auth.routes"));
+const admin_routes_1 = __importDefault(require("./routes/admin.routes"));
 const chef_route_1 = __importDefault(require("./routes/chef.route"));
 const menu_routes_1 = __importDefault(require("./routes/menu.routes"));
 dotenv_1.default.config();
@@ -31,6 +32,7 @@ app.use(express_1.default.urlencoded({ extended: true }));
 const apiPrefix = '/api/v1/';
 // Routes
 app.use(apiPrefix, auth_routes_1.default);
+app.use(apiPrefix, admin_routes_1.default);
 app.use(apiPrefix, chef_route_1.default);
 app.use(apiPrefix, menu_routes_1.default);
 app.use(apiPrefix, stateRoutes_1.default);
