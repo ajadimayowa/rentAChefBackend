@@ -12,6 +12,7 @@ const stateRoutes_1 = __importDefault(require("./routes/stateRoutes"));
 const auth_routes_1 = __importDefault(require("./routes/auth.routes"));
 const admin_routes_1 = __importDefault(require("./routes/admin.routes"));
 const chef_route_1 = __importDefault(require("./routes/chef.route"));
+const user_routes_1 = __importDefault(require("./routes/user.routes"));
 const menu_routes_1 = __importDefault(require("./routes/menu.routes"));
 dotenv_1.default.config();
 // Connect to DB
@@ -34,6 +35,7 @@ const apiPrefix = '/api/v1/';
 app.use(apiPrefix, auth_routes_1.default);
 app.use(apiPrefix, admin_routes_1.default);
 app.use(apiPrefix, chef_route_1.default);
+app.use(apiPrefix, user_routes_1.default);
 app.use(apiPrefix, menu_routes_1.default);
 app.use(apiPrefix, stateRoutes_1.default);
 // Server

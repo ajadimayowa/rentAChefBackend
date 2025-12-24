@@ -3,13 +3,13 @@ import { Router } from 'express';
 
 import { verifyToken } from '../middleware/auth.middleware';
 import { login, register, verifyEmail, verifyLoginOtp } from '../controllers/chefAuthControllers/auth.controller';
+import { getAllUsers } from '../controllers/user/user.controller';
+import { adminAuth } from '../middleware/adminAuth';
 
 const router = Router();
 
-router.get('/user/dashboard', register);
-router.post('/auth/verify-email', verifyEmail);
-router.post('/auth/login', login);
-router.post('/auth/verify-loginOtp', verifyLoginOtp);
+router.get('/user/users',adminAuth, getAllUsers);
+router.get('/user/:id',adminAuth, getAllUsers);
 
 // router.post('/auth/request-password-reset-otp', requestPasswordResetOtp);
 // router.post('/auth/reset-password-with-otp', resetUserPasswordWithOtp);

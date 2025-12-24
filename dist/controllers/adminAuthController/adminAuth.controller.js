@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createAdmin = exports.adminLogin = void 0;
+exports.deleteAdmin = exports.updateAdmin = exports.getAdminById = exports.getAdmins = exports.createAdmin = exports.adminLogin = void 0;
 const Admin_1 = __importDefault(require("../../models/Admin"));
 const generateToken_1 = require("../../utils/generateToken");
 const adminLogin = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -74,3 +74,138 @@ const createAdmin = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     }
 });
 exports.createAdmin = createAdmin;
+const getAdmins = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const page = Math.max(Number(req.query.page) || 1, 1);
+        const limit = Math.max(Number(req.query.limit) || 10, 1);
+        const skip = (page - 1) * limit;
+        const [admins, total] = yield Promise.all([
+            Admin_1.default.find()
+                .select("-password")
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit),
+            Admin_1.default.countDocuments(),
+        ]);
+        return res.status(200).json({
+            success: true,
+            data: admins,
+            meta: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            },
+        });
+    }
+    catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: "Failed to fetch admins",
+            error,
+        });
+    }
+});
+exports.getAdmins = getAdmins;
+const getAdminById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const admin = yield Admin_1.default.findById(req.params.id).select("-password");
+        if (!admin) {
+            return res.status(404).json({
+                success: false,
+                message: "Admin not found",
+            });
+        }
+        return res.status(200).json({
+            success: true,
+            data: admin,
+        });
+    }
+    catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: "Failed to fetch admin",
+            error,
+        });
+    }
+});
+exports.getAdminById = getAdminById;
+/**
+ * =====================
+ * UPDATE ADMIN
+ * =====================
+ */
+const updateAdmin = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { fullName, email, role, isActive, password } = req.body;
+        const admin = yield Admin_1.default.findById(req.params.id);
+        if (!admin) {
+            return res.status(404).json({
+                success: false,
+                message: "Admin not found",
+            });
+        }
+        if (fullName !== undefined)
+            admin.fullName = fullName;
+        if (email !== undefined)
+            admin.email = email;
+        if (role !== undefined)
+            admin.role = role;
+        if (isActive !== undefined)
+            admin.isActive = isActive;
+        // Allow password update (will be hashed by pre-save hook)
+        if (password) {
+            admin.password = password;
+        }
+        yield admin.save();
+        const updatedAdmin = admin.toJSON();
+        // delete updatedAdmin.password;
+        return res.status(200).json({
+            success: true,
+            message: "Admin updated successfully",
+            data: updatedAdmin,
+        });
+    }
+    catch (error) {
+        if (error.code === 11000) {
+            return res.status(400).json({
+                success: false,
+                message: "Email already exists",
+            });
+        }
+        return res.status(500).json({
+            success: false,
+            message: "Failed to update admin",
+            error,
+        });
+    }
+});
+exports.updateAdmin = updateAdmin;
+/**
+ * =====================
+ * DELETE ADMIN
+ * =====================
+ */
+const deleteAdmin = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const admin = yield Admin_1.default.findByIdAndDelete(req.params.id);
+        if (!admin) {
+            return res.status(404).json({
+                success: false,
+                message: "Admin not found",
+            });
+        }
+        return res.status(200).json({
+            success: true,
+            message: "Admin deleted successfully",
+        });
+    }
+    catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: "Failed to delete admin",
+            error,
+        });
+    }
+});
+exports.deleteAdmin = deleteAdmin;

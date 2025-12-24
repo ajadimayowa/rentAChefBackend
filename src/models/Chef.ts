@@ -7,6 +7,7 @@ export interface IChef extends Document {
   email: string;
   bio?: string;
   specialties: string[];
+  category:string;
   phoneNumber: number;
   location?: string;
   state: string,
@@ -30,6 +31,7 @@ const ChefSchema = new Schema<IChef>({
   email: { type: String, required: true, unique: true },
   bio: { type: String },
   specialties: { type: [String], default: [] },
+  category:{type: String, required: true },
   phoneNumber: { type: Number, required: true },
   location: { type: String, required: true },
   state: { type: String, required: true },
