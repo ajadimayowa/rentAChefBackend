@@ -21,6 +21,20 @@ export const statesData = [
             "Item"
         ]
     },
+
+    {
+        id: 36,
+        state: "Abuja",
+        city: "Fedral Capital Teritory",
+        localGovernmentAreas: [
+            "Abaji",
+            "Abuja Municipal Area Council (AMAC)",
+            "Bwari",
+            "Gwagwalada",
+            "Kuje",
+            "Kwali"
+        ]
+    },
     {
         id: 2,
         state: "Adamawa State",
@@ -635,6 +649,36 @@ export const statesData = [
             "Riyom",
             "Shendam",
             "Wase"
+        ]
+    },
+    {
+        id: 35,
+        state: "Rivers State",
+        city: "Port Harcourt",
+        localGovernmentAreas: [
+            "Abua–Odual",
+            "Ahoada East",
+            "Ahoada West",
+            "Akuku-Toru",
+            "Andoni",
+            "Asari-Toru",
+            "Bonny",
+            "Degema",
+            "Eleme",
+            "Emohua",
+            "Etche",
+            "Gokana",
+            "Ikwerre",
+            "Khana",
+            "Obio-Akpor",
+            "Ogba–Egbema–Ndoni",
+            "Ogu-Bolo",
+            "Okrika",
+            "Omuma",
+            "Opobo–Nkoro",
+            "Oyigbo",
+            "Port Harcourt",
+            "Tai"
         ]
     },
     {

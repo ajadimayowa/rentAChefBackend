@@ -5,10 +5,11 @@ import bcrypt from 'bcryptjs';
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 
-// ✅ Create Chef (ADMIN only)
+
 export const createChef = async (req: Request, res: Response): Promise<any> => {
-    const chefPic = (req.file as any);
     try {
+        const chefPic = req.file as any; // multer file
+
         const {
             staffId,
             name,
@@ -20,55 +21,62 @@ export const createChef = async (req: Request, res: Response): Promise<any> => {
             location,
             state,
             stateId,
-            defaultPassword
+            defaultPassword,
+            category
         } = req.body;
 
-        console.log({
-            adminSent:req?.body
-        })
-        if (!staffId || !name || !email || !location|| !state) {
-            return res.status(400).json({ message: "staffId, location,state, phone number, name & email are required" });
+        console.log({ adminSent: req.body });
+
+        if (!staffId || !name || !email || !location || !state) {
+            return res.status(400).json({ message: "staffId, location, state, name & email are required" });
         }
 
-        const exists = await Chef.findOne({
-            $or: [{ email }, { staffId }]
-        });
-
+        // Check if chef already exists
+        const exists = await Chef.findOne({ $or: [{ email }, { staffId }] });
         if (exists) {
             return res.status(400).json({ message: "Chef already exists" });
         }
 
-        // If admin didn't specify password, generate one
+        // Handle password
         const pass = defaultPassword || "Chef@123";
-
         const hashedPassword = await bcrypt.hash(pass, 12);
 
+        // Parse specialties JSON
+        let specialtiesArray: string[] = [];
+        try {
+            specialtiesArray = specialties ? JSON.parse(specialties) : [];
+        } catch (err) {
+            return res.status(400).json({ message: "Invalid specialties format. Should be an array of strings." });
+        }
+
+        // Create chef
         const chef = await Chef.create({
             staffId,
             name,
             gender,
             email,
             bio,
-            specialties : JSON.parse(req.body.specialties),
+            specialties: specialtiesArray,
             location,
             state,
             stateId,
-            profilePic:chefPic.location,
+            profilePic: chefPic?.location || chefPic?.path || "", // depending on S3 or local
             phoneNumber,
             password: hashedPassword,
             isActive: true,
-            isPasswordUpdated: false
+            isPasswordUpdated: false,
+            category
         });
 
-       return res.status(201).json({
+        return res.status(201).json({
             message: "Chef created successfully",
-            defaultPassword: pass, // Send to admin to give the chef
+            defaultPassword: pass,
             chef
         });
 
     } catch (error) {
-        console.log(error)
-       return res.status(500).json({ message: "Error creating chef", error });
+        console.error(error);
+        return res.status(500).json({ message: "Error creating chef", error });
     }
 };
 
@@ -118,42 +126,93 @@ export const loginChef = async (req: Request, res: Response): Promise<any> => {
 };
 
 
-// ✅ Get all chefs (ANY authenticated user)
+
 export const getAllChefs = async (req: Request, res: Response): Promise<any> => {
-    try {
-        const chefs = await Chef.find().select('-password')
-            // .populate("menus")
-            // .sort({ createdAt: -1 });
+  try {
+    // Pagination params
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const limit = Math.max(Number(req.query.limit) || 10, 1);
+    const skip = (page - 1) * limit;
 
-        return res.status(200).json({ success: true, payload: chefs });
+    // Filters
+    const { location, state, isActive } = req.query;
 
-    } catch (error) {
-        return res.status(500).json({success:false, message: "Error fetching chefs", payload:error });
+    const filter: any = {};
+
+    if (location) {
+      filter.location = location;
     }
+
+    if (state) {
+      filter.state = state;
+    }
+
+    if (isActive !== undefined) {
+      filter.isActive = isActive === "true";
+    }
+
+    // Query
+    const [chefs, total] = await Promise.all([
+      Chef.find(filter)
+        .select("-password")
+        // .populate("menus") // enable if needed
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Chef.countDocuments(filter),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+      payload: chefs,
+    });
+
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Error fetching chefs",
+      payload: error,
+    });
+  }
 };
 
 
 
 // ✅ Get one chef
-export const getChefById = async (req: Request, res: Response): Promise<any> => {
-    try {
+export const getChefById = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
 
-        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-            return res.status(400).json({ message: "Invalid ID" });
-        }
-
-        const chef = await Chef.findById(req.params.id)
-        // .populate("menus");
-
-        if (!chef) {
-            return res.status(404).json({ message: "Chef not found" });
-        }
-
-        res.status(200).json({ chef });
-
-    } catch (error) {
-        res.status(500).json({ message: "Error fetching chef", error });
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400).json({ success: false, message: "Invalid ID" });
+      return;
     }
+
+    const chef = await Chef.findById(id)
+      .select("-password") // ✅ exclude password
+
+    if (!chef) {
+      res.status(404).json({ success: false, message: "Chef not found" });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      payload: chef,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error fetching chef",
+      error,
+    });
+  }
 };
 
 

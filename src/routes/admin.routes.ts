@@ -1,5 +1,5 @@
 import express from "express";
-import { adminLogin, createAdmin } from "../controllers/adminAuthController/adminAuth.controller";
+import { adminLogin, createAdmin, deleteAdmin, getAdminById, getAdminDashboard, getAdmins, updateAdmin } from "../controllers/adminAuthController/adminAuth.controller";
 import { adminAuth } from "../middleware/adminAuth";
 import { superAdminOnly } from "../middleware/superAdminOnly";
 
@@ -20,6 +20,12 @@ router.post(
   superAdminOnly,
   createAdmin
 );
+
+router.get("/admin/dashboard",adminAuth, getAdminDashboard);              // GET /admins?page=1&limit=10
+router.get("/admin/admins", getAdmins);              // GET /admins?page=1&limit=10
+router.get("/admin/:id", getAdminById);         // GET /admins/:id
+router.put("/admin/:id", updateAdmin);          // PUT /admins/:id
+router.delete("/admin/:id", deleteAdmin);       // DELETE /admins/:id
 
 // Chefs
 // router.post("/chefs", adminAuth, createChef);

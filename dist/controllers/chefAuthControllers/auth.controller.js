@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.me = exports.chefLogin = exports.verifyLoginOtp = exports.login = exports.verifyEmail = exports.register = void 0;
+exports.me = exports.chefLogin = exports.changePasswordWithOtp = exports.requestPasswordChangeOtp = exports.verifyLoginOtp = exports.login = exports.verifyEmail = exports.register = void 0;
 // import User from '../models/User';
 const User_model_1 = __importDefault(require("../../models/User.model"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
@@ -20,7 +20,6 @@ const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const otpUtils_1 = require("../../utils/otpUtils");
 const usersEmailNotifs_1 = require("../../services/email/rentAChef/usersEmailNotifs");
 const Chef_1 = __importDefault(require("../../models/Chef"));
-const userLoginOtpEmailNotifs_1 = require("../../services/email/rentAChef/userLoginOtpEmailNotifs");
 const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { email, password, fullName, phoneNumber } = req.body;
     if (!email || !password || !fullName || !phoneNumber) {
@@ -37,7 +36,7 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         const isAdmin = req.body.adminSecret === process.env.ADMIN_SECRET;
         const emailVerificationOtp = (0, otpUtils_1.generateOtp)();
         const user = yield User_model_1.default.create({ email: formatedEmail, phone: phoneNumber, emailVerificationOtp, password: hashed, fullName, firstName, isAdmin });
-        console.log({ seeEmailVerOtp: emailVerificationOtp });
+        // console.log({ seeEmailVerOtp: emailVerificationOtp })
         yield (0, usersEmailNotifs_1.sendEmailVerificationOtp)({
             firstName,
             email: formatedEmail,
@@ -92,6 +91,11 @@ const verifyEmail = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         customer.isEmailVerified = true;
         customer.emailVerificationOtp = "";
         yield customer.save();
+        let firstName = customer === null || customer === void 0 ? void 0 : customer.firstName;
+        yield (0, usersEmailNotifs_1.sendEmailVerificationSuccessEmail)({
+            firstName,
+            email,
+        });
         return res.status(200).json({
             success: true,
             message: "Email verified successfully.",
@@ -143,23 +147,18 @@ const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         user.loginOtp = otp;
         user.loginOtpExpires = otpExpires;
         yield user.save();
-        console.log({ seeOtp: otp });
-        yield (0, userLoginOtpEmailNotifs_1.sendUserLoginOtpNotificationEmail)({
-            firstName: user.firstName,
-            email: user.email,
-            loginOtpCode: otp,
-        });
         // Send OTP via email
-        // try {
-        //   await sendLoginOtpEmail({
-        //     firstName: user.firstName,
-        //     email: user.email,
-        //     loginOtp: otp,
-        //   });
-        // } catch (error) {
-        //   console.error("Error sending OTP email:", error);
-        //   // Don't block login flow if email fails, just log it
-        // }
+        try {
+            yield (0, usersEmailNotifs_1.sendLoginOtpEmail)({
+                firstName: user.firstName,
+                email: user.email,
+                loginOtp: otp,
+            });
+        }
+        catch (error) {
+            console.error("Error sending OTP email:", error);
+            // Don't block login flow if email fails, just log it
+        }
         return res.status(200).json({
             success: true,
             message: "OTP sent to email.",
@@ -223,6 +222,16 @@ const verifyLoginOtp = (req, res) => __awaiter(void 0, void 0, void 0, function*
         yield customer.save();
         // Optionally generate a JWT token
         const token = jsonwebtoken_1.default.sign({ id: customer._id, email: customer.email, isAdmin: customer.isAdmin }, process.env.JWT_SECRET, { expiresIn: "7d" });
+        // Send OTP via email
+        try {
+            yield (0, usersEmailNotifs_1.sendLoginSuccessEmail)({
+                firstName: customer.firstName,
+                email: customer.email,
+            });
+        }
+        catch (error) {
+            console.log(error);
+        }
         return res.status(200).json({
             success: true,
             message: "Login OTP verified successfully.",
@@ -244,6 +253,95 @@ const verifyLoginOtp = (req, res) => __awaiter(void 0, void 0, void 0, function*
     }
 });
 exports.verifyLoginOtp = verifyLoginOtp;
+/**
+ * REQUEST PASSWORD CHANGE OTP
+ */
+const requestPasswordChangeOtp = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { email } = req.body;
+        const user = yield User_model_1.default.findOne({ email });
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        const otp = (0, otpUtils_1.generateOtp)();
+        user.loginOtp = otp;
+        user.loginOtpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+        yield user.save();
+        // await sendEmail(
+        //   user.email,
+        //   'Password Reset OTP',
+        //   `Your password reset OTP is ${otp}. It expires in 10 minutes.`
+        // );
+        // Send OTP via email
+        try {
+            yield (0, usersEmailNotifs_1.sendUserPasswordResetOTPEmail)({
+                firstName: user.firstName,
+                email: user.email,
+                loginOtp: otp,
+            });
+        }
+        catch (error) {
+            console.error("Error sending OTP email:", error);
+            // Don't block login flow if email fails, just log it
+        }
+        return res.status(200).json({
+            success: true,
+            message: 'Password reset OTP sent to email',
+        });
+    }
+    catch (error) {
+        return res.status(500).json({ message: 'Server error' });
+    }
+});
+exports.requestPasswordChangeOtp = requestPasswordChangeOtp;
+/**
+ * CHANGE PASSWORD WITH OTP
+ */
+/**
+ * CHANGE PASSWORD WITH OTP
+ */
+const changePasswordWithOtp = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { email, otp, newPassword } = req.body;
+        const user = yield User_model_1.default.findOne({ email });
+        if (!user || !user.loginOtp || !user.loginOtpExpires) {
+            return res.status(400).json({ message: 'Invalid request' });
+        }
+        if (user.loginOtp !== otp) {
+            return res.status(400).json({ message: 'Invalid OTP' });
+        }
+        if (user.loginOtpExpires < new Date()) {
+            return res.status(400).json({ message: 'OTP expired' });
+        }
+        const hashedPassword = yield bcryptjs_1.default.hash(newPassword, 10);
+        user.password = hashedPassword;
+        // clear otp
+        user.loginOtp = undefined;
+        user.loginOtpExpires = undefined;
+        yield user.save();
+        try {
+            yield (0, usersEmailNotifs_1.sendPasswordChangeSuccessEmail)({
+                firstName: user.firstName,
+                email: user.email,
+            });
+        }
+        catch (error) {
+            console.log(error);
+        }
+        return res.status(200).json({
+            success: true,
+            message: 'Password changed successfully',
+        });
+    }
+    catch (error) {
+        return res.status(500).json({ message: 'Server error' });
+    }
+});
+exports.changePasswordWithOtp = changePasswordWithOtp;
+/**
+ * RESEND PASSWORD CHANGE OTP
+ */
+//chef auths
 const chefLogin = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { email, password } = req.body;

@@ -1,12 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
-const auth_controller_1 = require("../controllers/chefAuthControllers/auth.controller");
+const user_controller_1 = require("../controllers/user/user.controller");
+const adminAuth_1 = require("../middleware/adminAuth");
 const router = (0, express_1.Router)();
-router.get('/user/dashboard', auth_controller_1.register);
-router.post('/auth/verify-email', auth_controller_1.verifyEmail);
-router.post('/auth/login', auth_controller_1.login);
-router.post('/auth/verify-loginOtp', auth_controller_1.verifyLoginOtp);
+router.get('/user/users', adminAuth_1.adminAuth, user_controller_1.getAllUsers);
+router.get('/user/:id', adminAuth_1.adminAuth, user_controller_1.getAllUsers);
 // router.post('/auth/request-password-reset-otp', requestPasswordResetOtp);
 // router.post('/auth/reset-password-with-otp', resetUserPasswordWithOtp);
 // router.post('/register-staff', (req, res, next) => {

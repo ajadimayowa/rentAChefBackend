@@ -12,127 +12,91 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteCategory = exports.updateCategory = exports.getCategoryById = exports.getCategories = exports.createCategory = void 0;
-const Category_model_1 = __importDefault(require("../../models/Category.model"));
-// Create Category
+exports.deleteCategory = exports.updateCategory = exports.getSingleCategory = exports.getAllCategories = exports.createCategory = void 0;
+const Category_1 = __importDefault(require("../../models/Category"));
+/**
+ * Create Category
+ */
 const createCategory = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { name, slug, description, parentCategory, image } = req.body;
-        const existing = yield Category_model_1.default.findOne({ name });
-        if (existing) {
-            res.status(400).json({ message: "Category already exists" });
-            return;
+        const catPic = req.file; // multer file
+        const { name, description } = req.body;
+        if (!name || !description) {
+            return res.status(400).json({ message: "name, description are required" });
         }
-        const category = new Category_model_1.default({
+        const category = yield Category_1.default.create({
             name,
-            slug,
             description,
-            parentCategory: parentCategory || null,
-            image,
+            image: (catPic === null || catPic === void 0 ? void 0 : catPic.location) || (catPic === null || catPic === void 0 ? void 0 : catPic.path) || "", // depending on S3 or local
         });
-        const saved = yield category.save();
-        res.status(201).json({ message: "Category created successfully", data: saved });
+        return res.status(201).json({ success: true, payload: category });
     }
     catch (error) {
-        res.status(500).json({ message: "Error creating category", error });
+        return res.status(400).json({ success: false, message: error.message });
     }
 });
 exports.createCategory = createCategory;
-// Get All Categories (with optional parent filtering)
-const getCategories = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+/**
+ * Get All Categories
+ */
+const getAllCategories = (_req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { id, name, page = 1, limit = 10, parentId } = req.query;
-        const query = {};
-        // Filter by ID
-        if (id)
-            query._id = id;
-        // Search by name (case-insensitive)
-        if (name)
-            query.name = { $regex: name, $options: "i" };
-        // Filter by parent category
-        if (parentId)
-            query.parentCategory = parentId;
-        const pageNum = parseInt(page, 10);
-        const limitNum = parseInt(limit, 10);
-        const skip = (pageNum - 1) * limitNum;
-        // Get total count for pagination metadata
-        const total = yield Category_model_1.default.countDocuments(query);
-        // Fetch paginated categories
-        const categories = yield Category_model_1.default.find(query)
-            .populate("parentCategory", "name slug")
-            .skip(skip)
-            .limit(limitNum)
-            .sort({ createdAt: -1 });
-        res.status(200).json({
-            message: "Categories retrieved successfully",
-            pagination: {
-                total,
-                currentPage: pageNum,
-                totalPages: Math.ceil(total / limitNum),
-                limit: limitNum,
-            },
-            payload: { success: true, data: categories },
+        const categories = yield Category_1.default.find().sort({ createdAt: -1 });
+        return res.status(200).json({ success: true, payload: categories });
+    }
+    catch (error) {
+        return res.status(500).json({ success: false, message: "Failed to fetch categories" });
+    }
+});
+exports.getAllCategories = getAllCategories;
+/**
+ * Get Category by ID or Slug
+ */
+const getSingleCategory = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { id } = req.params;
+        const category = yield Category_1.default.findOne({
+            $or: [{ _id: id }, { slug: id }],
         });
-    }
-    catch (error) {
-        res.status(500).json({ message: "Error fetching categories", error });
-    }
-});
-exports.getCategories = getCategories;
-// Get Single Category
-const getCategoryById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const category = yield Category_model_1.default.findById(req.params.id).populate("parentCategory", "name slug");
         if (!category) {
-            res.status(404).json({ message: "Category not found" });
-            return;
+            return res.status(404).json({ success: false, message: "Category not found" });
         }
-        res.status(200).json({ message: "Category retrieved", data: category });
+        return res.status(200).json({ success: true, payload: category });
     }
     catch (error) {
-        res.status(500).json({ message: "Error fetching category", error });
+        return res.status(400).json({ success: false, message: "Invalid category ID" });
     }
 });
-exports.getCategoryById = getCategoryById;
-// Update Category
+exports.getSingleCategory = getSingleCategory;
+/**
+ * Update Category
+ */
 const updateCategory = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { name, description, image, isActive, parentCategory } = req.body;
-        const category = yield Category_model_1.default.findById(req.params.id);
+        const category = yield Category_1.default.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
         if (!category) {
-            res.status(404).json({ message: "Category not found" });
-            return;
+            return res.status(404).json({ success: false, message: "Category not found" });
         }
-        if (name)
-            category.name = name;
-        if (description)
-            category.description = description;
-        if (image)
-            category.image = image;
-        if (isActive !== undefined)
-            category.isActive = isActive;
-        if (parentCategory)
-            category.parentCategory = parentCategory;
-        const updated = yield category.save();
-        res.status(200).json({ message: "Category updated successfully", data: updated });
+        return res.status(200).json({ success: true, payload: category });
     }
     catch (error) {
-        res.status(500).json({ message: "Error updating category", error });
+        return res.status(400).json({ success: false, message: error.message });
     }
 });
 exports.updateCategory = updateCategory;
-// Delete Category
+/**
+ * Delete Category
+ */
 const deleteCategory = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const category = yield Category_model_1.default.findByIdAndDelete(req.params.id);
+        const category = yield Category_1.default.findByIdAndDelete(req.params.id);
         if (!category) {
-            res.status(404).json({ message: "Category not found" });
-            return;
+            return res.status(404).json({ success: false, message: "Category not found" });
         }
-        res.status(200).json({ message: "Category deleted successfully" });
+        return res.status(200).json({ success: true, message: "Category deleted successfully" });
     }
     catch (error) {
-        res.status(500).json({ message: "Error deleting category", error });
+        return res.status(400).json({ success: false, message: "Invalid category ID" });
     }
 });
 exports.deleteCategory = deleteCategory;
