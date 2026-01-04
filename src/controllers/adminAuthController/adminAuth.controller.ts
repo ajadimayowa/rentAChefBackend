@@ -1,6 +1,9 @@
 import { Request, Response } from "express";
 import Admin from "../../models/Admin";
 import { generateToken } from "../../utils/generateToken";
+import Booking from "../../models/Booking";
+import Chef from "../../models/Chef";
+import UserModel from "../../models/User.model";
 
 export const adminLogin = async (req: Request, res: Response):Promise<any> => {
   try {
@@ -116,6 +119,56 @@ export const getAdminById = async (req: Request, res: Response):Promise<any>  =>
     return res.status(200).json({
       success: true,
       data: admin,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch admin",
+      error,
+    });
+  }
+};
+
+export const getAdminDashboard = async (req: Request, res: Response):Promise<any>  => {
+  
+  try {
+    const bookings = await Booking.find();
+    const chefs = await Chef.find();
+    const customers = await UserModel.find();
+    const grouped: Record<string, number> = {};
+    bookings.forEach((booking) => {
+      const day = booking.createdAt.toLocaleDateString('en-US', {
+        weekday: 'short',
+      });
+
+      grouped[day] = (grouped[day] || 0) + 1;
+    });
+    const chartData = Object.entries(grouped).map(
+      ([day, count]) => ({
+        name: day,     // 👈 xKey
+        users: count,  // 👈 dataKey
+      })
+    );
+    // const admin = await Admin.findById(req.params.id).select("-password");
+
+    // if (!admin) {
+    //   return res.status(404).json({
+    //     success: false,
+    //     message: "Admin not found",
+    //   });
+    // }
+
+    return res.status(200).json({
+      success: true,
+      payload: {
+        cardData:{
+          revenue:500000,
+        customers:customers.length,
+        chefs:chefs.length
+        },
+        bookings: chartData
+          
+      },
     });
   } catch (error) {
     return res.status(500).json({

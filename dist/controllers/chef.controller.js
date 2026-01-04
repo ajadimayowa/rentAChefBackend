@@ -106,16 +106,51 @@ const loginChef = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     }
 });
 exports.loginChef = loginChef;
-// ✅ Get all chefs (ANY authenticated user)
 const getAllChefs = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const chefs = yield Chef_1.default.find().select('-password');
-        // .populate("menus")
-        // .sort({ createdAt: -1 });
-        return res.status(200).json({ success: true, payload: chefs });
+        // Pagination params
+        const page = Math.max(Number(req.query.page) || 1, 1);
+        const limit = Math.max(Number(req.query.limit) || 10, 1);
+        const skip = (page - 1) * limit;
+        // Filters
+        const { location, state, isActive } = req.query;
+        const filter = {};
+        if (location) {
+            filter.location = location;
+        }
+        if (state) {
+            filter.state = state;
+        }
+        if (isActive !== undefined) {
+            filter.isActive = isActive === "true";
+        }
+        // Query
+        const [chefs, total] = yield Promise.all([
+            Chef_1.default.find(filter)
+                .select("-password")
+                // .populate("menus") // enable if needed
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit),
+            Chef_1.default.countDocuments(filter),
+        ]);
+        return res.status(200).json({
+            success: true,
+            meta: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            },
+            payload: chefs,
+        });
     }
     catch (error) {
-        return res.status(500).json({ success: false, message: "Error fetching chefs", payload: error });
+        return res.status(500).json({
+            success: false,
+            message: "Error fetching chefs",
+            payload: error,
+        });
     }
 });
 exports.getAllChefs = getAllChefs;

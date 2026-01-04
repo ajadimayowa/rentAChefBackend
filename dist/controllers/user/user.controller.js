@@ -15,31 +15,35 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getUserById = exports.getAllUsers = void 0;
 const mongoose_1 = __importDefault(require("mongoose"));
 const User_model_1 = __importDefault(require("../../models/User.model"));
-// Get all users (with pagination & search)
 const getAllUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { page = 1, limit = 10, search } = req.query;
-        const pageNum = parseInt(page, 10);
-        const limitNum = parseInt(limit, 10);
+        const { page = 1, limit = 10, search = "" } = req.query;
+        const pageNum = Math.max(parseInt(page, 10), 1);
+        const limitNum = Math.max(parseInt(limit, 10), 1);
         const skip = (pageNum - 1) * limitNum;
         const query = {};
-        // Search by full name or email (case-insensitive)
-        if (search) {
+        if (search && typeof search === "string") {
+            const regex = new RegExp(search.trim(), "i");
             query.$or = [
-                { "profile.fullName": { $regex: search, $options: "i" } },
-                { "contact.email": { $regex: search, $options: "i" } },
+                { "profile.fullName": regex },
+                { "profile.firstName": regex },
+                { "profile.lastName": regex },
+                { "contact.email": regex },
+                { "contact.phoneNumber": regex },
             ];
         }
-        const total = yield User_model_1.default.countDocuments(query);
-        const users = yield User_model_1.default.find(query)
-            .skip(skip)
-            .limit(limitNum)
-            .sort({ createdAt: -1 });
+        const [total, users] = yield Promise.all([
+            User_model_1.default.countDocuments(query),
+            User_model_1.default.find(query)
+                .skip(skip)
+                .limit(limitNum)
+                .sort({ createdAt: -1 }),
+        ]);
         res.status(200).json({
             message: "Users retrieved successfully",
-            pagination: {
+            meta: {
                 total,
-                currentPage: pageNum,
+                page: pageNum,
                 totalPages: Math.ceil(total / limitNum),
                 limit: limitNum,
             },

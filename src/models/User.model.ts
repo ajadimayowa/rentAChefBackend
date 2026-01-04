@@ -7,7 +7,7 @@ export interface IUser extends Document {
   isEmailVerified: boolean;
   password: string;
   loginOtp?: string;
-  loginOtpExpires: Date;
+  loginOtpExpires: Date | any;
   fullName?: string;
   firstName: string;
   phone?: string;

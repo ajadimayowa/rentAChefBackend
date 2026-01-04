@@ -18,7 +18,7 @@ import { adminAuth } from "../middleware/adminAuth";
 const router = express.Router();
 
 // Public / Authenticated
-router.get("/chef/all", getAllChefs);
+router.get("/chefs", getAllChefs);
 router.get("/chef/:id", getChefById);
 router.put("/chef/:id", updateChef);
 

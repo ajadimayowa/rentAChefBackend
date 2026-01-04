@@ -17,6 +17,7 @@ const router = express_1.default.Router();
 // Auth
 router.post("/admin/login", adminAuth_controller_1.adminLogin);
 router.post("/admin/create", adminAuth_1.adminAuth, superAdminOnly_1.superAdminOnly, adminAuth_controller_1.createAdmin);
+router.get("/admin/dashboard", adminAuth_1.adminAuth, adminAuth_controller_1.getAdminDashboard); // GET /admins?page=1&limit=10
 router.get("/admin/admins", adminAuth_controller_1.getAdmins); // GET /admins?page=1&limit=10
 router.get("/admin/:id", adminAuth_controller_1.getAdminById); // GET /admins/:id
 router.put("/admin/:id", adminAuth_controller_1.updateAdmin); // PUT /admins/:id

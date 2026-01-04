@@ -1,15 +1,36 @@
 import mongoose, { Schema, Document } from "mongoose";
 
+export interface ICategoryService {
+  label: string;
+  price: number;
+}
+
 export interface ICategory extends Document {
   name: string;
-  description?: string;
+  description: string;
   slug: string;
   image?: string;
-  parentCategory?: mongoose.Types.ObjectId;
+  services: ICategoryService[];
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
+
+const categoryServiceSchema = new Schema<ICategoryService>(
+  {
+    label: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    price: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+  },
+  { _id: false } // services don’t need their own _id
+);
 
 const categorySchema = new Schema<ICategory>(
   {
@@ -21,11 +42,9 @@ const categorySchema = new Schema<ICategory>(
     },
     description: {
       type: String,
-      trim: true,
     },
     slug: {
       type: String,
-      required: true,
       unique: true,
       lowercase: true,
       trim: true,
@@ -34,10 +53,9 @@ const categorySchema = new Schema<ICategory>(
       type: String,
       default: "",
     },
-    parentCategory: {
-      type: Schema.Types.ObjectId,
-      ref: "Category",
-      default: null,
+    services: {
+      type: [categoryServiceSchema],
+      default: [],
     },
     isActive: {
       type: Boolean,
@@ -49,16 +67,16 @@ const categorySchema = new Schema<ICategory>(
     toJSON: {
       virtuals: true,
       versionKey: false,
-      transform: function (_doc, ret:any) {
+      transform(_doc, ret: any) {
         ret.id = ret._id.toString();
         delete ret._id;
         return ret;
-      }
-    }
+      },
+    },
   }
 );
 
-// 🔁 Auto-generate slug from category name before saving
+// 🔁 Auto-generate slug
 categorySchema.pre("save", function (next) {
   if (this.isModified("name")) {
     this.slug = this.name
@@ -70,5 +88,4 @@ categorySchema.pre("save", function (next) {
 });
 
 const Category = mongoose.model<ICategory>("Category", categorySchema);
-
 export default Category;

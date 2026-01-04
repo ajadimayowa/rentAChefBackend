@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendLoginOtpEmail = exports.sendEmailVerificationOtp = void 0;
+exports.sendPasswordChangeSuccessEmail = exports.sendUserPasswordResetOTPEmail = exports.sendLoginSuccessEmail = exports.sendEmailVerificationSuccessEmail = exports.sendLoginOtpEmail = exports.sendEmailVerificationOtp = void 0;
 const emailService_1 = require("../emailService");
 const handlebars_1 = __importDefault(require("handlebars"));
 const path_1 = __importDefault(require("path"));
@@ -45,6 +45,34 @@ const sendEmailVerificationOtp = (creatorData) => __awaiter(void 0, void 0, void
     }
 });
 exports.sendEmailVerificationOtp = sendEmailVerificationOtp;
+const sendEmailVerificationSuccessEmail = (creatorData) => __awaiter(void 0, void 0, void 0, function* () {
+    const { firstName, email, logoUrl, footerUrl } = creatorData;
+    const templatePath = path_1.default.join(process.cwd(), 'src', 'services', 'email', 'emailTemps', 'rentAChef', 'EmailVerificationSuccessTemplate.hbs');
+    const templateSource = fs_1.default.readFileSync(templatePath, 'utf-8');
+    // Compile the Handlebars templates
+    const template = handlebars_1.default.compile(templateSource);
+    const html = template({ firstName, email, orgPrimaryColor: '#ffffffff' });
+    const subject = 'Email Verified';
+    const remoteImages = [
+        {
+            url: logoUrl || 'https://rentachefdev.s3.eu-north-1.amazonaws.com/assets/chefLogo.png',
+            cid: 'logo',
+        },
+        {
+            url: footerUrl || 'https://rentachefdev.s3.eu-north-1.amazonaws.com/assets/chefFooter.jpg',
+            cid: 'footer',
+        },
+    ];
+    try {
+        console.log({ sendingTo: email });
+        yield (0, emailService_1.sendMail)({ userEmail: email, subject, html, remoteImages });
+        console.log('email sent successfully!');
+    }
+    catch (error) {
+        console.error('Error email:', error);
+    }
+});
+exports.sendEmailVerificationSuccessEmail = sendEmailVerificationSuccessEmail;
 const sendLoginOtpEmail = (creatorData) => __awaiter(void 0, void 0, void 0, function* () {
     const { firstName, email, loginOtp, logoUrl, footerUrl } = creatorData;
     const templatePath = path_1.default.join(process.cwd(), 'src', 'services', 'email', 'emailTemps', 'rentAChef', 'LoginOtpEmailTemplate.hbs');
@@ -52,7 +80,7 @@ const sendLoginOtpEmail = (creatorData) => __awaiter(void 0, void 0, void 0, fun
     // Compile the Handlebars templates
     const template = handlebars_1.default.compile(templateSource);
     const html = template({ firstName, email, loginOtp, orgPrimaryColor: '#ffffffff' });
-    const subject = 'Email Verification';
+    const subject = 'Login OTP';
     const remoteImages = [
         {
             url: logoUrl || 'https://rentachefdev.s3.eu-north-1.amazonaws.com/assets/chefLogo.png',
@@ -72,6 +100,62 @@ const sendLoginOtpEmail = (creatorData) => __awaiter(void 0, void 0, void 0, fun
     }
 });
 exports.sendLoginOtpEmail = sendLoginOtpEmail;
+const sendLoginSuccessEmail = (creatorData) => __awaiter(void 0, void 0, void 0, function* () {
+    const { firstName, email, logoUrl, footerUrl } = creatorData;
+    const templatePath = path_1.default.join(process.cwd(), 'src', 'services', 'email', 'emailTemps', 'rentAChef', 'LoginSuccessEmailTemplate.hbs');
+    const templateSource = fs_1.default.readFileSync(templatePath, 'utf-8');
+    // Compile the Handlebars templates
+    const template = handlebars_1.default.compile(templateSource);
+    const html = template({ firstName, email, orgPrimaryColor: '#ffffffff' });
+    const subject = 'Recent Login';
+    const remoteImages = [
+        {
+            url: logoUrl || 'https://rentachefdev.s3.eu-north-1.amazonaws.com/assets/chefLogo.png',
+            cid: 'logo',
+        },
+        {
+            url: footerUrl || 'https://rentachefdev.s3.eu-north-1.amazonaws.com/assets/chefFooter.jpg',
+            cid: 'footer',
+        },
+    ];
+    try {
+        console.log({ sendingTo: email });
+        yield (0, emailService_1.sendMail)({ userEmail: email, subject, html, remoteImages });
+        console.log('email sent successfully!');
+    }
+    catch (error) {
+        console.error('Error email:', error);
+    }
+});
+exports.sendLoginSuccessEmail = sendLoginSuccessEmail;
+const sendPasswordChangeSuccessEmail = (creatorData) => __awaiter(void 0, void 0, void 0, function* () {
+    const { firstName, email, logoUrl, footerUrl } = creatorData;
+    const templatePath = path_1.default.join(process.cwd(), 'src', 'services', 'email', 'emailTemps', 'rentAChef', 'PasswordResetSuccessEmailTemplate.hbs');
+    const templateSource = fs_1.default.readFileSync(templatePath, 'utf-8');
+    // Compile the Handlebars templates
+    const template = handlebars_1.default.compile(templateSource);
+    const html = template({ firstName, email, orgPrimaryColor: '#ffffffff' });
+    const subject = 'Password changed';
+    const remoteImages = [
+        {
+            url: logoUrl || 'https://rentachefdev.s3.eu-north-1.amazonaws.com/assets/chefLogo.png',
+            cid: 'logo',
+        },
+        {
+            url: footerUrl || 'https://rentachefdev.s3.eu-north-1.amazonaws.com/assets/chefFooter.jpg',
+            cid: 'footer',
+        },
+    ];
+    try {
+        console.log({ sendingTo: email });
+        yield (0, emailService_1.sendMail)({ userEmail: email, subject, html, remoteImages });
+        console.log('email sent successfully!');
+    }
+    catch (error) {
+        console.error('Error email:', error);
+    }
+});
+exports.sendPasswordChangeSuccessEmail = sendPasswordChangeSuccessEmail;
 const sendRegistrationNotificationEmail2 = (creatorData) => __awaiter(void 0, void 0, void 0, function* () {
     const { firstName, email, logoUrl, footerUrl } = creatorData;
     const loginTime = new Date().toLocaleString(); // Get the current date and time
@@ -99,3 +183,31 @@ const sendRegistrationNotificationEmail2 = (creatorData) => __awaiter(void 0, vo
         console.error('Error email:', error);
     }
 });
+//password reset
+const sendUserPasswordResetOTPEmail = (creatorData) => __awaiter(void 0, void 0, void 0, function* () {
+    const { firstName, email, loginOtp } = creatorData;
+    const templatePath = path_1.default.join(process.cwd(), 'src', 'services', 'email', 'emailTemps', 'rentAChef', 'PaswordResetOtpEmailTemplate.hbs');
+    const templateSource = fs_1.default.readFileSync(templatePath, 'utf-8');
+    // Compile the Handlebars templates
+    const template = handlebars_1.default.compile(templateSource);
+    const html = template({ firstName, email, loginOtp, orgPrimaryColor: '#ffffffff' });
+    const subject = 'Password reset otp';
+    const remoteImages = [
+        {
+            url: 'https://rentachefdev.s3.eu-north-1.amazonaws.com/assets/chefLogo.png',
+            cid: 'logo',
+        },
+        {
+            url: 'https://rentachefdev.s3.eu-north-1.amazonaws.com/assets/chefFooter.jpg',
+            cid: 'footer',
+        },
+    ];
+    try {
+        yield (0, emailService_1.sendMail)({ userEmail: email, subject, html, remoteImages });
+        console.log('email sent successfully!');
+    }
+    catch (error) {
+        console.error('Error email:', error);
+    }
+});
+exports.sendUserPasswordResetOTPEmail = sendUserPasswordResetOTPEmail;

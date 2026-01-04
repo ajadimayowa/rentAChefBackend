@@ -5,9 +5,8 @@ import UserModel from '../../models/User.model';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { generateOtp } from '../../utils/otpUtils';
-import { sendEmailVerificationOtp, sendLoginOtpEmail } from '../../services/email/rentAChef/usersEmailNotifs';
+import { sendEmailVerificationOtp, sendEmailVerificationSuccessEmail, sendLoginOtpEmail, sendLoginSuccessEmail, sendPasswordChangeSuccessEmail, sendUserPasswordResetOTPEmail } from '../../services/email/rentAChef/usersEmailNotifs';
 import Chef from '../../models/Chef';
-import { sendUserLoginOtpNotificationEmail } from '../../services/email/rentAChef/userLoginOtpEmailNotifs';
 
 
 export const register = async (req: Request, res: Response): Promise<any> => {
@@ -29,7 +28,7 @@ export const register = async (req: Request, res: Response): Promise<any> => {
     const emailVerificationOtp = generateOtp()
     const user = await UserModel.create({ email: formatedEmail, phone: phoneNumber, emailVerificationOtp, password: hashed, fullName,firstName, isAdmin });
 
-    console.log({ seeEmailVerOtp: emailVerificationOtp })
+    // console.log({ seeEmailVerOtp: emailVerificationOtp })
      await  sendEmailVerificationOtp({
           firstName,
           email:formatedEmail,
@@ -92,11 +91,18 @@ export const verifyEmail = async (req: Request, res: Response): Promise<any> => 
     customer.isEmailVerified = true;
     customer.emailVerificationOtp = "";
     await customer.save();
+    let firstName = customer?.firstName
+    await  sendEmailVerificationSuccessEmail({
+          firstName,
+          email,
+      })
 
     return res.status(200).json({
       success: true,
       message: "Email verified successfully.",
     });
+
+    
   } catch (error: any) {
     console.error("Error verifying email:", error);
     return res.status(500).json({
@@ -154,24 +160,17 @@ export const login = async (req: Request, res: Response): Promise<any> => {
     user.loginOtpExpires = otpExpires;
     await user.save();
 
-    console.log({ seeOtp: otp })
-    await sendUserLoginOtpNotificationEmail({
-       firstName: user.firstName,
-        email: user.email,
-        loginOtpCode: otp,
-    })
-
     // Send OTP via email
-    // try {
-    //   await sendLoginOtpEmail({
-    //     firstName: user.firstName,
-    //     email: user.email,
-    //     loginOtp: otp,
-    //   });
-    // } catch (error) {
-    //   console.error("Error sending OTP email:", error);
-    //   // Don't block login flow if email fails, just log it
-    // }
+    try {
+      await sendLoginOtpEmail({
+        firstName: user.firstName,
+        email: user.email,
+        loginOtp: otp,
+      });
+    } catch (error) {
+      console.error("Error sending OTP email:", error);
+      // Don't block login flow if email fails, just log it
+    }
 
     return res.status(200).json({
       success: true,
@@ -248,6 +247,17 @@ export const verifyLoginOtp = async (req: Request, res: Response): Promise<any> 
       { expiresIn: "7d" }
     );
 
+    // Send OTP via email
+    
+    try {
+        await sendLoginSuccessEmail({
+        firstName: customer.firstName,
+        email: customer.email,
+      });
+    } catch (error) {
+      console.log(error)
+    }
+
     return res.status(200).json({
       success: true,
       message: "Login OTP verified successfully.",
@@ -268,6 +278,111 @@ export const verifyLoginOtp = async (req: Request, res: Response): Promise<any> 
   }
 };
 
+
+
+/**
+ * REQUEST PASSWORD CHANGE OTP
+ */
+export const requestPasswordChangeOtp = async (req: Request, res: Response) : Promise<any> => {
+  try {
+    const { email } = req.body;
+
+    const user = await UserModel.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const otp = generateOtp();
+
+    user.loginOtp = otp;
+    user.loginOtpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+    await user.save();
+
+    // await sendEmail(
+    //   user.email,
+    //   'Password Reset OTP',
+    //   `Your password reset OTP is ${otp}. It expires in 10 minutes.`
+    // );
+
+    // Send OTP via email
+    try {
+      await sendUserPasswordResetOTPEmail({
+        firstName: user.firstName,
+        email: user.email,
+        loginOtp: otp,
+      });
+    } catch (error) {
+      console.error("Error sending OTP email:", error);
+      // Don't block login flow if email fails, just log it
+    }
+
+    return res.status(200).json({
+      success:true,
+      message: 'Password reset OTP sent to email',
+    });
+  } catch (error) {
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
+/**
+ * CHANGE PASSWORD WITH OTP
+ */
+
+
+/**
+ * CHANGE PASSWORD WITH OTP
+ */
+export const changePasswordWithOtp = async (req: Request, res: Response) : Promise<any> => {
+  try {
+    const { email, otp, newPassword } = req.body;
+
+    const user = await UserModel.findOne({ email });
+    if (!user || !user.loginOtp || !user.loginOtpExpires) {
+      return res.status(400).json({ message: 'Invalid request' });
+    }
+
+    if (user.loginOtp !== otp) {
+      return res.status(400).json({ message: 'Invalid OTP' });
+    }
+
+    if (user.loginOtpExpires < new Date()) {
+      return res.status(400).json({ message: 'OTP expired' });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    user.password = hashedPassword;
+
+    // clear otp
+    user.loginOtp = undefined;
+    user.loginOtpExpires = undefined;
+
+    await user.save();
+
+    try {
+        await sendPasswordChangeSuccessEmail({
+        firstName: user.firstName,
+        email: user.email,
+      });
+    } catch (error) {
+      console.log(error)
+    }
+
+    return res.status(200).json({
+      success:true,
+      message: 'Password changed successfully',
+    });
+  } catch (error) {
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
+/**
+ * RESEND PASSWORD CHANGE OTP
+ */
+
+
+//chef auths
 export const chefLogin = async (req: Request, res: Response): Promise<any> => {
   try {
     const { email, password } = req.body;

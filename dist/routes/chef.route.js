@@ -12,7 +12,7 @@ const adminAuth_1 = require("../middleware/adminAuth");
 // import { protect } from "../middlewares/auth";
 const router = express_1.default.Router();
 // Public / Authenticated
-router.get("/chef/all", chef_controller_1.getAllChefs);
+router.get("/chefs", chef_controller_1.getAllChefs);
 router.get("/chef/:id", chef_controller_1.getChefById);
 router.put("/chef/:id", chef_controller_1.updateChef);
 // Admin only
