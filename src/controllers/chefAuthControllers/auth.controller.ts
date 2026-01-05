@@ -377,9 +377,41 @@ export const changePasswordWithOtp = async (req: Request, res: Response) : Promi
   }
 };
 
+
 /**
  * RESEND PASSWORD CHANGE OTP
  */
+export const resendPasswordChangeOtp = async (req: Request, res: Response):Promise<any> => {
+  try {
+    const { email } = req.body;
+
+    const user = await UserModel.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const otp = generateOtp();
+
+    user.loginOtp = otp;
+    user.loginOtpExpires = new Date(Date.now() + 10 * 60 * 1000);
+    await user.save();
+
+     try {
+        await sendPasswordChangeSuccessEmail({
+        firstName: user.firstName,
+        email: user.email,
+      });
+    } catch (error) {
+      console.log(error)
+    }
+
+    return res.status(200).json({
+      message: 'OTP resent successfully',
+    });
+  } catch (error) {
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
 
 
 //chef auths

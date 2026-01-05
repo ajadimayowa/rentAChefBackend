@@ -18,6 +18,7 @@ const generateToken_1 = require("../../utils/generateToken");
 const Booking_1 = __importDefault(require("../../models/Booking"));
 const Chef_1 = __importDefault(require("../../models/Chef"));
 const User_model_1 = __importDefault(require("../../models/User.model"));
+const Category_1 = __importDefault(require("../../models/Category"));
 const adminLogin = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { email, password } = req.body;
@@ -33,6 +34,13 @@ const adminLogin = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             id: admin._id,
             role: admin.role
         });
+        const categories = yield Category_1.default.find()
+            .select('_id name') // only fetch what you need
+            .lean();
+        const formattedCategories = categories.map(cat => ({
+            label: cat.name,
+            value: cat._id,
+        }));
         res.status(200).json({
             success: true,
             message: "Login successful",
@@ -41,7 +49,8 @@ const adminLogin = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
                 id: admin._id,
                 fullName: admin.fullName,
                 email: admin.email,
-                role: admin.role
+                role: admin.role,
+                formattedCategories,
             }
         });
     }

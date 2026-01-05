@@ -12,7 +12,11 @@ const ChefSchema = new mongoose_1.Schema({
     email: { type: String, required: true, unique: true },
     bio: { type: String },
     specialties: { type: [String], default: [] },
-    category: { type: String, required: true },
+    category: {
+        type: mongoose_1.Schema.Types.ObjectId,
+        ref: "Category",
+        required: true,
+    },
     phoneNumber: { type: Number, required: true },
     location: { type: String, required: true },
     state: { type: String, required: true },

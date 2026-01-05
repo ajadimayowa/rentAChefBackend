@@ -23,7 +23,7 @@ router.get("/chef/:id", getChefById);
 router.put("/chef/:id", updateChef);
 
 // Admin only
-router.post("/chef/register",uploadAdImages.single("chefPic"),adminAuth, createChef);
+router.post("/chef/register",uploadAdImages.single("chefPic"),createChef);
 router.post("/chef/login", loginChef);
 router.patch("/chef/disable/:id", isAdmin, disableChef);
 router.delete("/chef/:id", isAdmin, deleteChef);

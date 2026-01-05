@@ -4,6 +4,8 @@ import mongoose from "mongoose";
 import bcrypt from 'bcryptjs';
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
+import { sendLoginSuccessEmail } from "../services/email/rentAChef/usersEmailNotifs";
+import { sendChefCreationSuccessEmail } from "../services/email/rentAChef/chefsEmailNotification";
 
 
 export const createChef = async (req: Request, res: Response): Promise<any> => {
@@ -68,6 +70,14 @@ export const createChef = async (req: Request, res: Response): Promise<any> => {
             category
         });
 
+        try {
+          await sendChefCreationSuccessEmail({
+          email,
+          firstName:name
+        })
+        } catch (error) {
+          console.log(error)
+        }
         return res.status(201).json({
             message: "Chef created successfully",
             defaultPassword: pass,

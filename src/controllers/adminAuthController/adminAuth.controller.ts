@@ -4,6 +4,7 @@ import { generateToken } from "../../utils/generateToken";
 import Booking from "../../models/Booking";
 import Chef from "../../models/Chef";
 import UserModel from "../../models/User.model";
+import Category from "../../models/Category";
 
 export const adminLogin = async (req: Request, res: Response):Promise<any> => {
   try {
@@ -25,6 +26,14 @@ export const adminLogin = async (req: Request, res: Response):Promise<any> => {
       role: admin.role
     });
 
+    const categories = await Category.find()
+  .select('_id name') // only fetch what you need
+  .lean();
+
+const formattedCategories = categories.map(cat => ({
+  label: cat.name,
+  value: cat._id,
+}));
     res.status(200).json({
       success:true,
       message: "Login successful",
@@ -33,7 +42,8 @@ export const adminLogin = async (req: Request, res: Response):Promise<any> => {
         id: admin._id,
         fullName: admin.fullName,
         email: admin.email,
-        role: admin.role
+        role: admin.role,
+        formattedCategories,
       }
     });
   } catch (error) {

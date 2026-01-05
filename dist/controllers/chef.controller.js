@@ -17,6 +17,7 @@ const Chef_1 = __importDefault(require("../models/Chef"));
 const mongoose_1 = __importDefault(require("mongoose"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
+const chefsEmailNotification_1 = require("../services/email/rentAChef/chefsEmailNotification");
 const createChef = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const chefPic = req.file; // multer file
@@ -59,6 +60,15 @@ const createChef = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             isPasswordUpdated: false,
             category
         });
+        try {
+            yield (0, chefsEmailNotification_1.sendChefCreationSuccessEmail)({
+                email,
+                firstName: name
+            });
+        }
+        catch (error) {
+            console.log(error);
+        }
         return res.status(201).json({
             message: "Chef created successfully",
             defaultPassword: pass,
