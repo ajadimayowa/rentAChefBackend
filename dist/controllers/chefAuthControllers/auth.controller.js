@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.me = exports.chefLogin = exports.changePasswordWithOtp = exports.requestPasswordChangeOtp = exports.verifyLoginOtp = exports.login = exports.verifyEmail = exports.register = void 0;
+exports.me = exports.chefLogin = exports.resendPasswordChangeOtp = exports.changePasswordWithOtp = exports.requestPasswordChangeOtp = exports.verifyLoginOtp = exports.login = exports.verifyEmail = exports.register = void 0;
 // import User from '../models/User';
 const User_model_1 = __importDefault(require("../../models/User.model"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
@@ -341,6 +341,35 @@ exports.changePasswordWithOtp = changePasswordWithOtp;
 /**
  * RESEND PASSWORD CHANGE OTP
  */
+const resendPasswordChangeOtp = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { email } = req.body;
+        const user = yield User_model_1.default.findOne({ email });
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        const otp = (0, otpUtils_1.generateOtp)();
+        user.loginOtp = otp;
+        user.loginOtpExpires = new Date(Date.now() + 10 * 60 * 1000);
+        yield user.save();
+        try {
+            yield (0, usersEmailNotifs_1.sendPasswordChangeSuccessEmail)({
+                firstName: user.firstName,
+                email: user.email,
+            });
+        }
+        catch (error) {
+            console.log(error);
+        }
+        return res.status(200).json({
+            message: 'OTP resent successfully',
+        });
+    }
+    catch (error) {
+        return res.status(500).json({ message: 'Server error' });
+    }
+});
+exports.resendPasswordChangeOtp = resendPasswordChangeOtp;
 //chef auths
 const chefLogin = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {

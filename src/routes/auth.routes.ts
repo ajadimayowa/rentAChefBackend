@@ -2,7 +2,7 @@ import { Router } from 'express';
 // import { register, login } from '../controllers/auth.controller';
 
 import { verifyToken } from '../middleware/auth.middleware';
-import { changePasswordWithOtp, chefLogin, login, register, requestPasswordChangeOtp, verifyEmail, verifyLoginOtp } from '../controllers/chefAuthControllers/auth.controller';
+import { changePasswordWithOtp, chefLogin, login, register, requestPasswordChangeOtp, resendPasswordChangeOtp, verifyEmail, verifyLoginOtp } from '../controllers/chefAuthControllers/auth.controller';
 
 const router = Router();
 
@@ -14,6 +14,7 @@ router.post('/auth/verify-loginOtp', verifyLoginOtp);
 //password reset
 router.post('/auth/request-password-reset-otp', requestPasswordChangeOtp);
 router.post('/auth/reset-password-with-otp', changePasswordWithOtp);
+router.post('/auth/resend-password-reset-otp', resendPasswordChangeOtp);
 
 //chef auth
 router.post('/auth/chef/login', chefLogin);

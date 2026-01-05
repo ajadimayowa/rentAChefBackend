@@ -10,6 +10,7 @@ router.post('/auth/verify-loginOtp', auth_controller_1.verifyLoginOtp);
 //password reset
 router.post('/auth/request-password-reset-otp', auth_controller_1.requestPasswordChangeOtp);
 router.post('/auth/reset-password-with-otp', auth_controller_1.changePasswordWithOtp);
+router.post('/auth/resend-password-reset-otp', auth_controller_1.resendPasswordChangeOtp);
 //chef auth
 router.post('/auth/chef/login', auth_controller_1.chefLogin);
 // router.post('/register-staff', (req, res, next) => {
