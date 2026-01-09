@@ -6,6 +6,7 @@ import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 import { sendLoginSuccessEmail } from "../services/email/rentAChef/usersEmailNotifs";
 import { sendChefCreationSuccessEmail } from "../services/email/rentAChef/chefsEmailNotification";
+import Category from "../models/Category";
 
 
 export const createChef = async (req: Request, res: Response): Promise<any> => {
@@ -24,13 +25,14 @@ export const createChef = async (req: Request, res: Response): Promise<any> => {
             state,
             stateId,
             defaultPassword,
-            category
+            category,
+            categoryName,
         } = req.body;
 
-        console.log({ adminSent: req.body });
+        // console.log({ adminSent: req.body });
 
-        if (!staffId || !name || !email || !location || !state) {
-            return res.status(400).json({ message: "staffId, location, state, name & email are required" });
+        if (!staffId || !name || !email || !location || !state || !category) {
+            return res.status(400).json({ message: "staffId, category, location, state, name & email are required" });
         }
 
         // Check if chef already exists
@@ -51,6 +53,7 @@ export const createChef = async (req: Request, res: Response): Promise<any> => {
             return res.status(400).json({ message: "Invalid specialties format. Should be an array of strings." });
         }
 
+  //  const categoryName1 = await Category.findById(category).select("name");
         // Create chef
         const chef = await Chef.create({
             staffId,
@@ -67,7 +70,8 @@ export const createChef = async (req: Request, res: Response): Promise<any> => {
             password: hashedPassword,
             isActive: true,
             isPasswordUpdated: false,
-            category
+            category,
+            categoryName
         });
 
         try {
@@ -229,27 +233,79 @@ export const getChefById = async (req: Request, res: Response): Promise<void> =>
 
 // ✅ Update Chef (Admin OR Chef owner)
 export const updateChef = async (req: Request, res: Response): Promise<any> => {
-    try {
-        const updates = req.body;
+  try {
+    const { id } = req.params;
 
-        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-            return res.status(400).json({ message: "Invalid ID" });
-        }
-
-        const chef = await Chef.findByIdAndUpdate(req.params.id, updates, { new: true });
-
-        if (!chef) {
-            return res.status(404).json({ message: "Chef not found" });
-        }
-
-        res.status(200).json({
-            message: "Chef updated successfully",
-            chef,
-        });
-
-    } catch (error) {
-        res.status(500).json({ message: "Error updating chef", error });
+    // ✅ Validate MongoDB ID
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: "Invalid chef ID" });
     }
+
+    /**
+     * ✅ Whitelisted fields
+     * Prevent updating sensitive fields like password, isActive, staffId, etc.
+     */
+    const allowedUpdates = [
+      "name",
+      "gender",
+      "email",
+      "bio",
+      "specialties",
+      "category",
+      "phoneNumber",
+      "location",
+      "state",
+      "stateId",
+      "staffId",
+      "profilePic",
+    ];
+
+    const updates: Record<string, any> = {};
+
+    for (const key of allowedUpdates) {
+      if (req.body[key] !== undefined) {
+        updates[key] = req.body[key];
+      }
+    }
+
+    // ✅ If category is updated, also update categoryName
+    if (updates.category) {
+      if (!mongoose.Types.ObjectId.isValid(updates.category)) {
+        return res.status(400).json({ success: false, message: "Invalid category ID" });
+      }
+
+      const category = await Category.findById(updates.category).select("name");
+
+      if (!category) {
+        return res.status(404).json({ success: false, message: "Category not found" });
+      }
+
+      updates.categoryName = category.name;
+    }
+
+    const chef = await Chef.findByIdAndUpdate(id, updates, {
+      new: true,
+      runValidators: true,
+    }).populate("category", "name");
+
+    if (!chef) {
+      return res.status(404).json({ success: false, message: "Chef not found" });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Chef updated successfully",
+      payload: chef,
+    });
+
+  } catch (error: any) {
+    console.error("Update Chef Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error updating chef",
+      error: error.message,
+    });
+  }
 };
 
 

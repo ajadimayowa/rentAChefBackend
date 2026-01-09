@@ -20,10 +20,10 @@ const router = express.Router();
 // Public / Authenticated
 router.get("/chefs", getAllChefs);
 router.get("/chef/:id", getChefById);
-router.put("/chef/:id", updateChef);
+router.put("/chef/update/:id",adminAuth,uploadAdImages.single("chefPic"), updateChef);
 
 // Admin only
-router.post("/chef/register",uploadAdImages.single("chefPic"),createChef);
+router.post("/chef/register",adminAuth,uploadAdImages.single("chefPic"),createChef);
 router.post("/chef/login", loginChef);
 router.patch("/chef/disable/:id", isAdmin, disableChef);
 router.delete("/chef/:id", isAdmin, deleteChef);

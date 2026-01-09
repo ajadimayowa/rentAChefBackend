@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteMenu = exports.updateMenu = exports.getSingleMenu = exports.getAllMenus = exports.createMenu = void 0;
+exports.deleteMenu = exports.updateMenu = exports.getSingleMenu = exports.getMenus = exports.createMenu = void 0;
 const Menu_1 = __importDefault(require("../models/Menu"));
 const mongoose_1 = require("mongoose");
 /**
@@ -20,14 +20,15 @@ const mongoose_1 = require("mongoose");
  */
 const createMenu = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        const menuPic = req.file; // multer file
         const { chef, title, items, basePrice } = req.body;
-        if (!chef || !title || !items || !items.length) {
-            return res.status(400).json({ message: "Chef, title and items are required" });
+        if (!chef || !title || !menuPic || !basePrice) {
+            return res.status(400).json({ message: "Chef, title,picture and base price are required" });
         }
         const menu = yield Menu_1.default.create({
             chef,
             title,
-            items,
+            menuPic: (menuPic === null || menuPic === void 0 ? void 0 : menuPic.location) || (menuPic === null || menuPic === void 0 ? void 0 : menuPic.path) || "", // depending on S3 or local
             basePrice
         });
         return res.status(201).json({
@@ -44,18 +45,52 @@ exports.createMenu = createMenu;
 /**
  * GET ALL MENUS
  */
-const getAllMenus = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getMenus = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const menus = yield Menu_1.default.find()
-            .populate("chef", "name email")
-            .sort({ createdAt: -1 });
-        return res.status(200).json({ success: true, payload: menus });
+        const { chefId, price, name, page = "1", limit = "10", } = req.query;
+        const filter = {};
+        // Filter by chef
+        if (chefId) {
+            filter.chef = chefId;
+        }
+        // Filter by max price
+        if (price) {
+            filter.basePrice = { $lte: Number(price) };
+        }
+        // Filter by menu name (case-insensitive)
+        if (name) {
+            filter.title = { $regex: name, $options: "i" };
+        }
+        const pageNumber = Math.max(Number(page), 1);
+        const limitNumber = Math.max(Number(limit), 1);
+        const skip = (pageNumber - 1) * limitNumber;
+        const [menus, total] = yield Promise.all([
+            Menu_1.default.find(filter)
+                .populate("chef", "name email")
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limitNumber),
+            Menu_1.default.countDocuments(filter),
+        ]);
+        return res.status(200).json({
+            success: true,
+            payload: menus,
+            pagination: {
+                total,
+                page: pageNumber,
+                limit: limitNumber,
+                totalPages: Math.ceil(total / limitNumber),
+            },
+        });
     }
     catch (error) {
-        return res.status(500).json({ message: error.message });
+        return res.status(500).json({
+            success: false,
+            message: error.message,
+        });
     }
 });
-exports.getAllMenus = getAllMenus;
+exports.getMenus = getMenus;
 /**
  * GET SINGLE MENU
  */
