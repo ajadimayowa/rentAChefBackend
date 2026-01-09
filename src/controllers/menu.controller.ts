@@ -7,21 +7,22 @@ import { Types } from "mongoose";
  */
 export const createMenu = async (req: Request, res: Response): Promise<any> => {
   try {
-    const { chef, title, items,basePrice } = req.body;
+    const menuPic = req.file as any; // multer file
+    const { chef, title, items, basePrice } = req.body;
 
-    if (!chef || !title || !items || !items.length) {
-      return res.status(400).json({ message: "Chef, title and items are required" });
+    if (!chef || !title || !menuPic || !basePrice) {
+      return res.status(400).json({ message: "Chef, title,picture and base price are required" });
     }
 
     const menu = await Menu.create({
       chef,
       title,
-      items,
+      menuPic: menuPic?.location || menuPic?.path || "", // depending on S3 or local
       basePrice
     });
 
     return res.status(201).json({
-      success:true,
+      success: true,
       message: "Menu created successfully",
       data: menu,
     });
@@ -35,15 +36,64 @@ export const createMenu = async (req: Request, res: Response): Promise<any> => {
 /**
  * GET ALL MENUS
  */
-export const getAllMenus = async (req: Request, res: Response): Promise<any> => {
+export const getMenus = async (
+  req: Request,
+  res: Response
+): Promise<any> => {
   try {
-    const menus = await Menu.find()
-      .populate("chef", "name email")
-      .sort({ createdAt: -1 });
+    const {
+      chefId,
+      price,
+      name,
+      page = "1",
+      limit = "10",
+    } = req.query;
 
-    return res.status(200).json({success:true, payload: menus });
+    const filter: any = {};
+
+    // Filter by chef
+    if (chefId) {
+      filter.chef = chefId;
+    }
+
+    // Filter by max price
+    if (price) {
+      filter.basePrice = { $lte: Number(price) };
+    }
+
+    // Filter by menu name (case-insensitive)
+    if (name) {
+      filter.title = { $regex: name, $options: "i" };
+    }
+
+    const pageNumber = Math.max(Number(page), 1);
+    const limitNumber = Math.max(Number(limit), 1);
+    const skip = (pageNumber - 1) * limitNumber;
+
+    const [menus, total] = await Promise.all([
+      Menu.find(filter)
+        .populate("chef", "name email")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNumber),
+      Menu.countDocuments(filter),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      payload: menus,
+      pagination: {
+        total,
+        page: pageNumber,
+        limit: limitNumber,
+        totalPages: Math.ceil(total / limitNumber),
+      },
+    });
   } catch (error: any) {
-    return res.status(500).json({ message: error.message });
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
 

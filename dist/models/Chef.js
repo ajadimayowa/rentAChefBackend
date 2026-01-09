@@ -2,16 +2,17 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose_1 = require("mongoose");
 const ChefSchema = new mongoose_1.Schema({
-    staffId: { type: String, required: true, unique: true },
+    staffId: { type: String, required: true },
     name: { type: String, required: true },
     gender: {
         type: String,
         enum: ['m', 'f'],
         required: true
     },
-    email: { type: String, required: true, unique: true },
+    email: { type: String, required: true },
     bio: { type: String },
     specialties: { type: [String], default: [] },
+    categoryName: { type: String, required: true },
     category: {
         type: mongoose_1.Schema.Types.ObjectId,
         ref: "Category",

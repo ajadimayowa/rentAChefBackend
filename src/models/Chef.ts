@@ -7,7 +7,8 @@ export interface IChef extends Document {
   email: string;
   bio?: string;
   specialties: string[];
-  category:Types.ObjectId;
+  category: Types.ObjectId;
+  categoryName: string;
   phoneNumber: number;
   location?: string;
   state: string,
@@ -21,21 +22,22 @@ export interface IChef extends Document {
 }
 
 const ChefSchema = new Schema<IChef>({
-  staffId: { type: String, required: true, unique: true },
+  staffId: { type: String, required: true },
   name: { type: String, required: true },
   gender: {
     type: String,
     enum: ['m', 'f'],
     required: true
   },
-  email: { type: String, required: true, unique: true },
+  email: { type: String, required: true },
   bio: { type: String },
   specialties: { type: [String], default: [] },
+  categoryName: { type: String, required: true },
   category: {
-      type: Schema.Types.ObjectId,
-      ref: "Category",
-      required: true,
-    },
+    type: Schema.Types.ObjectId,
+    ref: "Category",
+    required: true,
+  },
   phoneNumber: { type: Number, required: true },
   location: { type: String, required: true },
   state: { type: String, required: true },

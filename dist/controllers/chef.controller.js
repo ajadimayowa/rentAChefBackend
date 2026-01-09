@@ -18,13 +18,14 @@ const mongoose_1 = __importDefault(require("mongoose"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const chefsEmailNotification_1 = require("../services/email/rentAChef/chefsEmailNotification");
+const Category_1 = __importDefault(require("../models/Category"));
 const createChef = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const chefPic = req.file; // multer file
-        const { staffId, name, gender, email, bio, phoneNumber, specialties, location, state, stateId, defaultPassword, category } = req.body;
-        console.log({ adminSent: req.body });
-        if (!staffId || !name || !email || !location || !state) {
-            return res.status(400).json({ message: "staffId, location, state, name & email are required" });
+        const { staffId, name, gender, email, bio, phoneNumber, specialties, location, state, stateId, defaultPassword, category, categoryName, } = req.body;
+        // console.log({ adminSent: req.body });
+        if (!staffId || !name || !email || !location || !state || !category) {
+            return res.status(400).json({ message: "staffId, category, location, state, name & email are required" });
         }
         // Check if chef already exists
         const exists = yield Chef_1.default.findOne({ $or: [{ email }, { staffId }] });
@@ -42,6 +43,7 @@ const createChef = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         catch (err) {
             return res.status(400).json({ message: "Invalid specialties format. Should be an array of strings." });
         }
+        //  const categoryName1 = await Category.findById(category).select("name");
         // Create chef
         const chef = yield Chef_1.default.create({
             staffId,
@@ -58,7 +60,8 @@ const createChef = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             password: hashedPassword,
             isActive: true,
             isPasswordUpdated: false,
-            category
+            category,
+            categoryName
         });
         try {
             yield (0, chefsEmailNotification_1.sendChefCreationSuccessEmail)({
@@ -195,21 +198,66 @@ exports.getChefById = getChefById;
 // ✅ Update Chef (Admin OR Chef owner)
 const updateChef = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const updates = req.body;
-        if (!mongoose_1.default.Types.ObjectId.isValid(req.params.id)) {
-            return res.status(400).json({ message: "Invalid ID" });
+        const { id } = req.params;
+        // ✅ Validate MongoDB ID
+        if (!mongoose_1.default.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ success: false, message: "Invalid chef ID" });
         }
-        const chef = yield Chef_1.default.findByIdAndUpdate(req.params.id, updates, { new: true });
+        /**
+         * ✅ Whitelisted fields
+         * Prevent updating sensitive fields like password, isActive, staffId, etc.
+         */
+        const allowedUpdates = [
+            "name",
+            "gender",
+            "email",
+            "bio",
+            "specialties",
+            "category",
+            "phoneNumber",
+            "location",
+            "state",
+            "stateId",
+            "staffId",
+            "profilePic",
+        ];
+        const updates = {};
+        for (const key of allowedUpdates) {
+            if (req.body[key] !== undefined) {
+                updates[key] = req.body[key];
+            }
+        }
+        // ✅ If category is updated, also update categoryName
+        if (updates.category) {
+            if (!mongoose_1.default.Types.ObjectId.isValid(updates.category)) {
+                return res.status(400).json({ success: false, message: "Invalid category ID" });
+            }
+            const category = yield Category_1.default.findById(updates.category).select("name");
+            if (!category) {
+                return res.status(404).json({ success: false, message: "Category not found" });
+            }
+            updates.categoryName = category.name;
+        }
+        const chef = yield Chef_1.default.findByIdAndUpdate(id, updates, {
+            new: true,
+            runValidators: true,
+        }).populate("category", "name");
         if (!chef) {
-            return res.status(404).json({ message: "Chef not found" });
+            return res.status(404).json({ success: false, message: "Chef not found" });
         }
-        res.status(200).json({
+        return res.status(200).json({
+            success: true,
             message: "Chef updated successfully",
-            chef,
+            payload: chef,
         });
     }
     catch (error) {
-        res.status(500).json({ message: "Error updating chef", error });
+        console.error("Update Chef Error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Error updating chef",
+            error: error.message,
+        });
     }
 });
 exports.updateChef = updateChef;
