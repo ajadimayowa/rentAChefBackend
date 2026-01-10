@@ -121,12 +121,12 @@ const loginChef = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
 exports.loginChef = loginChef;
 const getAllChefs = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        // Pagination params
+        // Pagination
         const page = Math.max(Number(req.query.page) || 1, 1);
         const limit = Math.max(Number(req.query.limit) || 10, 1);
         const skip = (page - 1) * limit;
         // Filters
-        const { location, state, isActive } = req.query;
+        const { location, state, isActive, name } = req.query;
         const filter = {};
         if (location) {
             filter.location = location;
@@ -137,11 +137,14 @@ const getAllChefs = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         if (isActive !== undefined) {
             filter.isActive = isActive === "true";
         }
+        // 🔍 Search by chef name (case-insensitive, partial match)
+        if (name) {
+            filter.name = { $regex: name, $options: "i" };
+        }
         // Query
         const [chefs, total] = yield Promise.all([
             Chef_1.default.find(filter)
                 .select("-password")
-                // .populate("menus") // enable if needed
                 .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(limit),

@@ -4,7 +4,6 @@ import { Schema, model, Document, Types } from 'mongoose';
 export interface IMenuItem {
     name: string;
     price: number;
-    menuPic?:string;
     description?: string;
 }
 

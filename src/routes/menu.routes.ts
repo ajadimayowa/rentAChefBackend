@@ -5,6 +5,7 @@ import {
   updateMenu,
   deleteMenu,
   getMenus,
+  addItemsToMenu,
 } from "../controllers/menu.controller";
 import { adminAuth } from "../middleware/adminAuth";
 import uploadAdImages from "../middleware/upload";
@@ -17,9 +18,10 @@ const router = express.Router();
 
 // router.post("/menu/create", createMenu);
 router.post("/menu/create",adminAuth,uploadAdImages.single("menuPic"),createMenu);
+router.post('/menu/add-items', addItemsToMenu);
 router.get("/menu/getMenus", getMenus);
-router.get("menu/:id", getSingleMenu);
-router.put("menu/:id", updateMenu);
-router.delete("menu/:id", deleteMenu);
+router.get("/menu/:id", getSingleMenu);
+router.put("/menu/:id", updateMenu);
+router.delete("/menu/:id", deleteMenu);
 
 export default router;

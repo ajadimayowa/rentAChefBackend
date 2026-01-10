@@ -143,13 +143,13 @@ export const loginChef = async (req: Request, res: Response): Promise<any> => {
 
 export const getAllChefs = async (req: Request, res: Response): Promise<any> => {
   try {
-    // Pagination params
+    // Pagination
     const page = Math.max(Number(req.query.page) || 1, 1);
     const limit = Math.max(Number(req.query.limit) || 10, 1);
     const skip = (page - 1) * limit;
 
     // Filters
-    const { location, state, isActive } = req.query;
+    const { location, state, isActive, name } = req.query;
 
     const filter: any = {};
 
@@ -165,11 +165,15 @@ export const getAllChefs = async (req: Request, res: Response): Promise<any> => 
       filter.isActive = isActive === "true";
     }
 
+    // 🔍 Search by chef name (case-insensitive, partial match)
+    if (name) {
+      filter.name = { $regex: name, $options: "i" };
+    }
+
     // Query
     const [chefs, total] = await Promise.all([
       Chef.find(filter)
         .select("-password")
-        // .populate("menus") // enable if needed
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit),
@@ -186,7 +190,6 @@ export const getAllChefs = async (req: Request, res: Response): Promise<any> => 
       },
       payload: chefs,
     });
-
   } catch (error) {
     return res.status(500).json({
       success: false,
