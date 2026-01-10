@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteMenu = exports.updateMenu = exports.getSingleMenu = exports.getMenus = exports.createMenu = void 0;
+exports.addItemsToMenu = exports.deleteMenu = exports.updateMenu = exports.getSingleMenu = exports.getMenus = exports.createMenu = void 0;
 const Menu_1 = __importDefault(require("../models/Menu"));
 const mongoose_1 = require("mongoose");
 /**
@@ -104,7 +104,7 @@ const getSingleMenu = (req, res) => __awaiter(void 0, void 0, void 0, function* 
         if (!menu) {
             return res.status(404).json({ message: "Menu not found" });
         }
-        return res.status(200).json({ data: menu });
+        return res.status(200).json({ success: true, payload: menu });
     }
     catch (error) {
         return res.status(500).json({ message: error.message });
@@ -115,24 +115,16 @@ exports.getSingleMenu = getSingleMenu;
  * UPDATE MENU
  */
 const updateMenu = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { id } = req.params;
-        const { title, items } = req.body;
-        if (!mongoose_1.Types.ObjectId.isValid(id)) {
-            return res.status(400).json({ message: "Invalid menu ID" });
-        }
-        const updatedMenu = yield Menu_1.default.findByIdAndUpdate(id, { title, items }, { new: true, runValidators: true });
-        if (!updatedMenu) {
-            return res.status(404).json({ message: "Menu not found" });
-        }
-        return res.status(200).json({
-            message: "Menu updated successfully",
-            data: updatedMenu,
-        });
+    const { id } = req.params;
+    const menu = yield Menu_1.default.findByIdAndUpdate(id, {
+        title: req.body.title,
+        basePrice: req.body.basePrice,
+        menuPic: req.body.menuPic,
+    }, { new: true, runValidators: true });
+    if (!menu) {
+        return res.status(404).json({ success: false, message: 'Menu not found' });
     }
-    catch (error) {
-        return res.status(500).json({ message: error.message });
-    }
+    res.status(200).json({ success: true, payload: menu });
 });
 exports.updateMenu = updateMenu;
 /**
@@ -155,3 +147,54 @@ const deleteMenu = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
     }
 });
 exports.deleteMenu = deleteMenu;
+const addItemsToMenu = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { menuId, items } = req.body;
+        if (!menuId) {
+            return res.status(400).json({
+                success: false,
+                message: 'menuId is required',
+            });
+        }
+        if (!Array.isArray(items)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Items must be an array',
+            });
+        }
+        if (items.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Menu must have at least one item',
+            });
+        }
+        const formattedItems = items.map((item) => ({
+            name: item.name,
+            price: Number(item.price),
+            description: item.description,
+        }));
+        const menu = yield Menu_1.default.findByIdAndUpdate(menuId, { items: formattedItems }, {
+            new: true,
+            runValidators: true,
+        });
+        if (!menu) {
+            return res.status(404).json({
+                success: false,
+                message: 'Menu not found',
+            });
+        }
+        return res.status(200).json({
+            success: true,
+            message: 'Menu items updated successfully',
+            payload: menu,
+        });
+    }
+    catch (error) {
+        console.error('Replace items error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to update menu items',
+        });
+    }
+});
+exports.addItemsToMenu = addItemsToMenu;

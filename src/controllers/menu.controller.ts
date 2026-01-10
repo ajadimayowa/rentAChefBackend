@@ -116,7 +116,7 @@ export const getSingleMenu = async (req: Request, res: Response): Promise<any> =
       return res.status(404).json({ message: "Menu not found" });
     }
 
-    return res.status(200).json({ data: menu });
+    return res.status(200).json({success:true, payload: menu });
   } catch (error: any) {
     return res.status(500).json({ message: error.message });
   }
@@ -127,32 +127,24 @@ export const getSingleMenu = async (req: Request, res: Response): Promise<any> =
 /**
  * UPDATE MENU
  */
-export const updateMenu = async (req: Request, res: Response): Promise<any> => {
-  try {
-    const { id } = req.params;
-    const { title, items } = req.body;
+export const updateMenu = async (req: Request, res: Response) :Promise<any> => {
+  const { id } = req.params;
 
-    if (!Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: "Invalid menu ID" });
-    }
+  const menu = await Menu.findByIdAndUpdate(
+    id,
+    {
+      title: req.body.title,
+      basePrice: req.body.basePrice,
+      menuPic: req.body.menuPic,
+    },
+    { new: true, runValidators: true }
+  );
 
-    const updatedMenu = await Menu.findByIdAndUpdate(
-      id,
-      { title, items },
-      { new: true, runValidators: true }
-    );
-
-    if (!updatedMenu) {
-      return res.status(404).json({ message: "Menu not found" });
-    }
-
-    return res.status(200).json({
-      message: "Menu updated successfully",
-      data: updatedMenu,
-    });
-  } catch (error: any) {
-    return res.status(500).json({ message: error.message });
+  if (!menu) {
+    return res.status(404).json({ success: false, message: 'Menu not found' });
   }
+
+  res.status(200).json({ success: true, payload: menu });
 };
 
 
@@ -177,5 +169,70 @@ export const deleteMenu = async (req: Request, res: Response): Promise<any> => {
     return res.status(200).json({ message: "Menu deleted successfully" });
   } catch (error: any) {
     return res.status(500).json({ message: error.message });
+  }
+};
+
+export const addItemsToMenu = async (
+  req: Request,
+  res: Response
+): Promise<any> => {
+  try {
+    const { menuId, items } = req.body;
+
+    if (!menuId) {
+      return res.status(400).json({
+        success: false,
+        message: 'menuId is required',
+      });
+    }
+
+    if (!Array.isArray(items)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Items must be an array',
+      });
+    }
+
+    if (items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Menu must have at least one item',
+      });
+    }
+
+    const formattedItems = items.map((item) => ({
+      name: item.name,
+      price: Number(item.price),
+      description: item.description,
+    }));
+
+    const menu = await Menu.findByIdAndUpdate(
+      menuId,
+      { items: formattedItems },
+      {
+        new: true,
+        runValidators: true,
+      }
+    );
+
+    if (!menu) {
+      return res.status(404).json({
+        success: false,
+        message: 'Menu not found',
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Menu items updated successfully',
+      payload: menu,
+    });
+  } catch (error: any) {
+    console.error('Replace items error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update menu items',
+    });
   }
 };
