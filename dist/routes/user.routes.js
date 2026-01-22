@@ -1,9 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
+// import { register, login } from '../controllers/auth.controller';
+const auth_middleware_1 = require("../middleware/auth.middleware");
 const user_controller_1 = require("../controllers/user/user.controller");
 const adminAuth_1 = require("../middleware/adminAuth");
 const router = (0, express_1.Router)();
+router.get('/user/dashboard', auth_middleware_1.verifyUserToken, user_controller_1.getAllUsers);
 router.get('/user/users', adminAuth_1.adminAuth, user_controller_1.getAllUsers);
 router.get('/user/:id', adminAuth_1.adminAuth, user_controller_1.getAllUsers);
 // router.post('/auth/request-password-reset-otp', requestPasswordResetOtp);

@@ -1,13 +1,14 @@
 import { Router } from 'express';
 // import { register, login } from '../controllers/auth.controller';
 
-import { verifyToken } from '../middleware/auth.middleware';
+import { verifyToken, verifyUserToken } from '../middleware/auth.middleware';
 import { login, register, verifyEmail, verifyLoginOtp } from '../controllers/chefAuthControllers/auth.controller';
 import { getAllUsers } from '../controllers/user/user.controller';
 import { adminAuth } from '../middleware/adminAuth';
 
 const router = Router();
 
+router.get('/user/dashboard',verifyUserToken, getAllUsers);
 router.get('/user/users',adminAuth, getAllUsers);
 router.get('/user/:id',adminAuth, getAllUsers);
 

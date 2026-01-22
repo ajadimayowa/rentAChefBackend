@@ -1,7 +1,7 @@
 export const statesData = [
     {
         id: 1,
-        state: "Abia State",
+        state: "Abia",
         localGovernmentAreas: [
             "Aba North",
             "Aba South",
@@ -21,7 +21,6 @@ export const statesData = [
             "Item"
         ]
     },
-
     {
         id: 36,
         state: "Abuja",
@@ -37,7 +36,7 @@ export const statesData = [
     },
     {
         id: 2,
-        state: "Adamawa State",
+        state: "Adamawa",
         localGovernmentAreas: [
             "Demsa",
             "Fufore",
@@ -60,7 +59,7 @@ export const statesData = [
     },
     {
         id: 3,
-        state: "Akwa Ibom State",
+        state: "Akwa Ibom",
         localGovernmentAreas: [
             "Abak",
             "Eastern Obolo",
@@ -91,7 +90,7 @@ export const statesData = [
     },
     {
         id: 4,
-        state: "Anambra State",
+        state: "Anambra",
         localGovernmentAreas: [
             "Aguata",
             "Anambra East",
@@ -116,7 +115,7 @@ export const statesData = [
     },
     {
         id: 5,
-        state: "Bauchi State",
+        state: "Bauchi",
         localGovernmentAreas: [
             "Alkaleri",
             "Bauchi",
@@ -134,7 +133,7 @@ export const statesData = [
     },
     {
         id: 6,
-        state: "Bayelsa State",
+        state: "Bayelsa",
         localGovernmentAreas: [
             "Brass",
             "Ekere",
@@ -147,7 +146,7 @@ export const statesData = [
     },
     {
         id: 7,
-        state: "Benue State",
+        state: "Benue",
         localGovernmentAreas: [
             "Ado",
             "Agatu",
@@ -170,7 +169,7 @@ export const statesData = [
     },
     {
         id: 8,
-        state: "Borno State",
+        state: "Borno",
         localGovernmentAreas: [
             "Abadam",
             "Askira/Uba",
@@ -196,7 +195,7 @@ export const statesData = [
     },
     {
         id: 9,
-        state: "Cross River State",
+        state: "Cross River",
         localGovernmentAreas: [
             "Akamkpa",
             "Akpabuyo",
@@ -215,7 +214,7 @@ export const statesData = [
     },
     {
         id: 10,
-        state: "Delta State",
+        state: "Delta",
         localGovernmentAreas: [
             "Aniocha North",
             "Aniocha South",
@@ -245,7 +244,7 @@ export const statesData = [
     },
     {
         id: 11,
-        state: "Ebonyi State",
+        state: "Ebonyi",
         localGovernmentAreas: [
             "Abakaliki",
             "Afikpo North",
@@ -260,7 +259,7 @@ export const statesData = [
     },
     {
         id: 12,
-        state: "Edo State",
+        state: "Edo",
         localGovernmentAreas: [
             "Akoko Edo",
             "Esan Central",
@@ -279,7 +278,7 @@ export const statesData = [
     },
     {
         id: 13,
-        state: "Ekiti State",
+        state: "Ekiti",
         localGovernmentAreas: [
             "Ado Ekiti",
             "Ekiti East",
@@ -297,7 +296,7 @@ export const statesData = [
     },
     {
         id: 14,
-        state: "Enugu State",
+        state: "Enugu",
         localGovernmentAreas: [
             "Enugu East",
             "Enugu North",
@@ -318,7 +317,7 @@ export const statesData = [
     },
     {
         id: 15,
-        state: "Gombe State",
+        state: "Gombe",
         localGovernmentAreas: [
             "Akko",
             "Balanga",
@@ -335,7 +334,7 @@ export const statesData = [
     },
     {
         id: 16,
-        state: "Imo State",
+        state: "Imo",
         localGovernmentAreas: [
             "Aboh Mbaise",
             "Ahiazu Mbaise",
@@ -357,7 +356,7 @@ export const statesData = [
     },
     {
         id: 17,
-        state: "Jigawa State",
+        state: "Jigawa",
         localGovernmentAreas: [
             "Auyo",
             "Babura",
@@ -377,7 +376,7 @@ export const statesData = [
     },
     {
         id: 18,
-        state: "Kaduna State",
+        state: "Kaduna",
         localGovernmentAreas: [
             "Birnin Gwari",
             "Chikun",
@@ -396,7 +395,7 @@ export const statesData = [
     },
     {
         id: 19,
-        state: "Kano State",
+        state: "Kano",
         localGovernmentAreas: [
             "Ajingi",
             "Albasu",
@@ -433,7 +432,7 @@ export const statesData = [
     },
     {
         id: 20,
-        state: "Kogi State",
+        state: "Kogi",
         localGovernmentAreas: [
             "Adavi",
             "Ajaokuta",
@@ -460,7 +459,7 @@ export const statesData = [
     },
     {
         id: 21,
-        state: "Kwara State",
+        state: "Kwara",
         localGovernmentAreas: [
             "Asa",
             "Baruten",
@@ -480,7 +479,7 @@ export const statesData = [
     },
     {
         id: 22,
-        state: "Lagos State",
+        state: "Lagos",
         localGovernmentAreas: [
             "Agege",
             "Ajeromi-Ifelodun",
@@ -504,7 +503,7 @@ export const statesData = [
     },
     {
         id: 23,
-        state: "Nasarawa State",
+        state: "Nasarawa",
         localGovernmentAreas: [
             "Akwanga",
             "Karshi",
@@ -519,7 +518,7 @@ export const statesData = [
     },
     {
         id: 24,
-        state: "Niger State",
+        state: "Niger",
         localGovernmentAreas: [
             "Agwara",
             "Bida",
@@ -541,7 +540,7 @@ export const statesData = [
     },
     {
         id: 25,
-        state: "Ogun State",
+        state: "Ogun",
         localGovernmentAreas: [
             "Abeokuta North",
             "Abeokuta South",
@@ -562,7 +561,7 @@ export const statesData = [
     },
     {
         id: 26,
-        state: "Ondo State",
+        state: "Ondo",
         localGovernmentAreas: [
             "Akure North",
             "Akure South",
@@ -580,7 +579,7 @@ export const statesData = [
     },
     {
         id: 27,
-        state: "Osun State",
+        state: "Osun",
         localGovernmentAreas: [
             "Aiyedaade",
             "Aiyedire",
@@ -606,7 +605,7 @@ export const statesData = [
     },
     {
         id: 28,
-        state: "Oyo State",
+        state: "Oyo",
         localGovernmentAreas: [
             "Akinyele",
             "Atiba",
@@ -634,7 +633,7 @@ export const statesData = [
     },
     {
         id: 29,
-        state: "Plateau State",
+        state: "Plateau",
         localGovernmentAreas: [
             "Bokkos",
             "Jos East",
@@ -653,7 +652,7 @@ export const statesData = [
     },
     {
         id: 35,
-        state: "Rivers State",
+        state: "Rivers",
         city: "Port Harcourt",
         localGovernmentAreas: [
             "Abua–Odual",
@@ -683,7 +682,7 @@ export const statesData = [
     },
     {
         id: 30,
-        state: "Rivers State",
+        state: "Rivers",
         localGovernmentAreas: [
             "Abua/Odual",
             "Ahoada East",
@@ -708,7 +707,7 @@ export const statesData = [
     },
     {
         id: 31,
-        state: "Sokoto State",
+        state: "Sokoto",
         localGovernmentAreas: [
             "Binji",
             "Bodinga",
@@ -732,7 +731,7 @@ export const statesData = [
     },
     {
         id: 32,
-        state: "Taraba State",
+        state: "Taraba",
         localGovernmentAreas: [
             "Ardo Kola",
             "Bali",
@@ -748,7 +747,7 @@ export const statesData = [
     },
     {
         id: 33,
-        state: "Yobe State",
+        state: "Yobe",
         localGovernmentAreas: [
             "Bade",
             "Bursari",
@@ -766,7 +765,7 @@ export const statesData = [
     },
     {
         id: 34,
-        state: "Zamfara State",
+        state: "Zamfara",
         localGovernmentAreas: [
             "Anka",
             "Bakura",
