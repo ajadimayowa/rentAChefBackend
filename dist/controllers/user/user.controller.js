@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getUserById = exports.getAllUsers = void 0;
+exports.getUserDashboard = exports.getUserById = exports.getAllUsers = void 0;
 const mongoose_1 = __importDefault(require("mongoose"));
 const User_model_1 = __importDefault(require("../../models/User.model"));
 const getAllUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -84,3 +84,28 @@ const getUserById = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     }
 });
 exports.getUserById = getUserById;
+const getUserDashboard = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { id } = req.params;
+        if (!mongoose_1.default.Types.ObjectId.isValid(id)) {
+            res.status(400).json({ message: "Invalid user ID" });
+            return;
+        }
+        const user = yield User_model_1.default.findById(id).select("-profile.password");
+        if (!user) {
+            res.status(404).json({ message: "User not found" });
+            return;
+        }
+        res.status(200).json({
+            message: "User retrieved successfully",
+            payload: user,
+        });
+    }
+    catch (error) {
+        res.status(500).json({
+            message: "Error fetching user",
+            error,
+        });
+    }
+});
+exports.getUserDashboard = getUserDashboard;
