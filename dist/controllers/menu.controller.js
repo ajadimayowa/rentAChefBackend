@@ -21,12 +21,13 @@ const mongoose_1 = require("mongoose");
 const createMenu = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const menuPic = req.file; // multer file
-        const { chef, title, items, basePrice } = req.body;
-        if (!chef || !title || !menuPic || !basePrice) {
-            return res.status(400).json({ message: "Chef, title,picture and base price are required" });
+        const { chef, isDefault, title, items, basePrice } = req.body;
+        if (!title || !menuPic || !basePrice) {
+            return res.status(400).json({ message: "Title,picture and base price are required" });
         }
         const menu = yield Menu_1.default.create({
             chef,
+            isDefault,
             title,
             menuPic: (menuPic === null || menuPic === void 0 ? void 0 : menuPic.location) || (menuPic === null || menuPic === void 0 ? void 0 : menuPic.path) || "", // depending on S3 or local
             basePrice

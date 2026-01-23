@@ -8,14 +8,15 @@ import { Types } from "mongoose";
 export const createMenu = async (req: Request, res: Response): Promise<any> => {
   try {
     const menuPic = req.file as any; // multer file
-    const { chef, title, items, basePrice } = req.body;
+    const {chef,isDefault, title, items, basePrice } = req.body;
 
-    if (!chef || !title || !menuPic || !basePrice) {
-      return res.status(400).json({ message: "Chef, title,picture and base price are required" });
+    if (!title || !menuPic || !basePrice) {
+      return res.status(400).json({ message: "Title,picture and base price are required" });
     }
 
     const menu = await Menu.create({
       chef,
+      isDefault,
       title,
       menuPic: menuPic?.location || menuPic?.path || "", // depending on S3 or local
       basePrice
