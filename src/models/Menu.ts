@@ -13,16 +13,18 @@ export interface IMenu extends Document {
     title: string;
     menuPic:string;
     items: IMenuItem[];
+    isDefault:boolean;
     basePrice:number;
     createdAt: Date;
 }
 
 
 const MenuSchema = new Schema<IMenu>({
-    chef: { type: Schema.Types.ObjectId, ref: 'Chef', required: true },
+    chef: { type: Schema.Types.ObjectId, ref: 'Chef'},
     title: { type: String, required: true },
     menuPic:{type: String},
     basePrice:{type: Number, required: true },
+    isDefault:{type: Boolean, required: true, default:false},
     items: [
         {
             name: { type: String, required: true },
