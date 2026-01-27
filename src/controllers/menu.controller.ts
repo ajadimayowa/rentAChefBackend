@@ -1,239 +1,179 @@
 import { Request, Response } from "express";
-import Menu from "../models/Menu";
-import { Types } from "mongoose";
+import { Menu } from "../models/Menu";
 
-/**
- * CREATE MENU
- */
-export const createMenu = async (req: Request, res: Response): Promise<any> => {
+/* ================= CREATE MENU ================= */
+export const createMenu = async (req: Request, res: Response): Promise<any>  => {
+  
   try {
-    const menuPic = req.file as any; // multer file
-    const {chef,isDefault, title, items, basePrice } = req.body;
-
-    if (!title || !menuPic || !basePrice) {
-      return res.status(400).json({ message: "Title,picture and base price are required" });
+    if (!req.file) {
+      return res.status(400).json({ message: "Menu picture is required" });
     }
+
+    const menuPicFile = req.file as any; // multer file
+
+    const weeks = JSON.parse(req.body.weeks);
 
     const menu = await Menu.create({
-      chef,
-      isDefault,
-      title,
-      menuPic: menuPic?.location || menuPic?.path || "", // depending on S3 or local
-      basePrice
+      chefId: req.body.chefId,
+      month: req.body.month,
+      createdBy: req.body.createdBy,
+      weeks,
+      menuPic: menuPicFile?.location || menuPicFile?.path || "",
     });
 
-    return res.status(201).json({
-      success: true,
-      message: "Menu created successfully",
-      data: menu,
-    });
+    res.status(201).json(menu);
   } catch (error: any) {
-    return res.status(500).json({ message: error.message });
+    if (error.code === 11000) {
+      return res.status(409).json({
+        message: "Menu already exists for this chef and month",
+      });
+    }
+    res.status(500).json({ message: error.message });
   }
 };
 
+/* ================= GET ALL MENUS ================= */
+export const getMenus = async (req: Request, res: Response): Promise<any> => {
+  const { chefId, month, approved } = req.query;
 
+  const filter: any = {};
+  if (chefId) filter.chefId = chefId;
+  if (month) filter.month = month;
+  if (approved !== undefined) filter.approved = approved;
 
-/**
- * GET ALL MENUS
- */
-export const getMenus = async (
-  req: Request,
-  res: Response
-): Promise<any> => {
-  try {
-    const {
-      chefId,
-      price,
-      name,
-      page = "1",
-      limit = "10",
-    } = req.query;
+  const menus = await Menu.find(filter)
+    .populate("chefId", "name")
+    .sort({ createdAt: -1 });
 
-    const filter: any = {};
-
-    // Filter by chef
-    if (chefId) {
-      filter.chef = chefId;
-    }
-
-    // Filter by max price
-    if (price) {
-      filter.basePrice = { $lte: Number(price) };
-    }
-
-    // Filter by menu name (case-insensitive)
-    if (name) {
-      filter.title = { $regex: name, $options: "i" };
-    }
-
-    const pageNumber = Math.max(Number(page), 1);
-    const limitNumber = Math.max(Number(limit), 1);
-    const skip = (pageNumber - 1) * limitNumber;
-
-    const [menus, total] = await Promise.all([
-      Menu.find(filter)
-        .populate("chef", "name email")
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limitNumber),
-      Menu.countDocuments(filter),
-    ]);
-
-    return res.status(200).json({
-      success: true,
-      payload: menus,
-      pagination: {
-        total,
-        page: pageNumber,
-        limit: limitNumber,
-        totalPages: Math.ceil(total / limitNumber),
-      },
-    });
-  } catch (error: any) {
-    return res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
+  res.json({success:true,payload:menus});
 };
 
+/* ================= GET MENU BY ID ================= */
+export const getMenuById = async (req: Request, res: Response): Promise<any>  => {
+  const menu = await Menu.findById(req.params.id)
+    .populate("chefId", "name");
 
+  if (!menu) {
+    return res.status(404).json({ message: "Menu not found" });
+  }
 
-/**
- * GET SINGLE MENU
- */
-export const getSingleMenu = async (req: Request, res: Response): Promise<any> => {
+  res.json(menu);
+};
+
+/* ================= GET MENU BY CHEF & MONTH ================= */
+export const getMenuByChefAndMonth = async (req: Request, res: Response): Promise<any> => {
   try {
-    const { id } = req.params;
+    const { chefId, month } = req.query;
 
-    if (!Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: "Invalid menu ID" });
-    }
-
-    const menu = await Menu.findById(id).populate("chef", "name email");
+    const menu = await Menu.findOne({ chefId, month });
 
     if (!menu) {
       return res.status(404).json({ message: "Menu not found" });
     }
 
-    return res.status(200).json({success:true, payload: menu });
+    res.json({ success: true, payload: menu });
   } catch (error: any) {
-    return res.status(500).json({ message: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
+/* ================= UPDATE MENU ================= */
+export const updateMenu = async (req: Request, res: Response): Promise<any> => {
 
-
-/**
- * UPDATE MENU
- */
-export const updateMenu = async (req: Request, res: Response) :Promise<any> => {
-  const { id } = req.params;
-
-  const menu = await Menu.findByIdAndUpdate(
-    id,
-    {
-      title: req.body.title,
-      basePrice: req.body.basePrice,
-      menuPic: req.body.menuPic,
-    },
-    { new: true, runValidators: true }
-  );
-
-  if (!menu) {
-    return res.status(404).json({ success: false, message: 'Menu not found' });
-  }
-
-  res.status(200).json({ success: true, payload: menu });
-};
-
-
-
-/**
- * DELETE MENU
- */
-export const deleteMenu = async (req: Request, res: Response): Promise<any> => {
   try {
-    const { id } = req.params;
+    const updateData: any = {};
+    const menuPicFile = req.file as any; // multer file
 
-    if (!Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: "Invalid menu ID" });
+    if (req.body.weeks) {
+      updateData.weeks = JSON.parse(req.body.weeks);
     }
 
-    const deletedMenu = await Menu.findByIdAndDelete(id);
+    if (req.body.month) updateData.month = req.body.month;
 
-    if (!deletedMenu) {
-      return res.status(404).json({ message: "Menu not found" });
+    if (req.file) {
+      updateData.menuPic = menuPicFile?.location || menuPicFile?.path || ""
     }
-
-    return res.status(200).json({ message: "Menu deleted successfully" });
-  } catch (error: any) {
-    return res.status(500).json({ message: error.message });
-  }
-};
-
-export const addItemsToMenu = async (
-  req: Request,
-  res: Response
-): Promise<any> => {
-  try {
-    const { menuId, items } = req.body;
-
-    if (!menuId) {
-      return res.status(400).json({
-        success: false,
-        message: 'menuId is required',
-      });
-    }
-
-    if (!Array.isArray(items)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Items must be an array',
-      });
-    }
-
-    if (items.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Menu must have at least one item',
-      });
-    }
-
-    const formattedItems = items.map((item) => ({
-      name: item.name,
-      price: Number(item.price),
-      description: item.description,
-    }));
 
     const menu = await Menu.findByIdAndUpdate(
-      menuId,
-      { items: formattedItems },
-      {
-        new: true,
-        runValidators: true,
-      }
+      req.params.id,
+      updateData,
+      { new: true, runValidators: true }
     );
 
     if (!menu) {
-      return res.status(404).json({
-        success: false,
-        message: 'Menu not found',
-      });
+      return res.status(404).json({ message: "Menu not found" });
     }
 
-    return res.status(200).json({
-      success: true,
-      message: 'Menu items updated successfully',
-      payload: menu,
-    });
+    res.json(menu);
   } catch (error: any) {
-    console.error('Replace items error:', error);
-
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to update menu items',
-    });
+    res.status(500).json({ message: error.message });
   }
+};
+
+/* ================= APPROVE MENU (ADMIN) ================= */
+export const approveMenu = async (req: Request, res: Response) => {
+  const menu = await Menu.findByIdAndUpdate(
+    req.params.id,
+    { approved: true },
+    { new: true }
+  );
+
+  if (!menu) {
+    return res.status(404).json({ message: "Menu not found" });
+  }
+
+  res.json(menu);
+};
+
+
+export const addProcurement = async (req: Request, res: Response): Promise<any> => {
+  const { procurement } = req.body;
+
+  const menu = await Menu.findByIdAndUpdate(
+    req.params.id,
+    {
+      $push: { procurement: { $each: procurement } }
+    },
+    { new: true }
+  );
+
+  if (!menu) {
+    return res.status(404).json({ message: "Menu not found" });
+  }
+
+  res.json(menu);
+};
+
+
+export const removeProcurementItem = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const menu = await Menu.findByIdAndUpdate(
+      req.params.menuId,
+      {
+        $pull: { procurement: { title: req.params.title } },
+      },
+      { new: true }
+    );
+
+    if (!menu) {
+      return res.status(404).json({ message: "Menu not found" });
+    }
+
+    res.json({ success: true, data: menu });
+  } catch (error: any) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+
+
+/* ================= DELETE MENU ================= */
+export const deleteMenu = async (req: Request, res: Response): Promise<any> => {
+  const menu = await Menu.findByIdAndDelete(req.params.id);
+
+  if (!menu) {
+    return res.status(404).json({ message: "Menu not found" });
+  }
+
+  res.json({ message: "Menu deleted successfully" });
 };

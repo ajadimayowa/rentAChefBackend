@@ -8,6 +8,7 @@ export interface IChef extends Document {
   bio?: string;
   specialties: string[];
   category: Types.ObjectId;
+  servicesOffered:Types.ObjectId[];
   categoryName: string;
   phoneNumber: number;
   location?: string;
@@ -38,6 +39,7 @@ const ChefSchema = new Schema<IChef>({
     ref: "Category",
     required: true,
   },
+  servicesOffered: [{ type: Schema.Types.ObjectId, ref: "Service" }],
   phoneNumber: { type: Number, required: true },
   location: { type: String, required: true },
   state: { type: String, required: true },
@@ -60,5 +62,6 @@ const ChefSchema = new Schema<IChef>({
     },
   },
 });
+
 ChefSchema.index({ staffId: 1, phoneNumber: 1 }, { unique: true });
 export default model<IChef>("Chef", ChefSchema);

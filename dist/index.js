@@ -16,6 +16,8 @@ const category_routes_1 = __importDefault(require("./routes/category.routes"));
 const services_routes_1 = __importDefault(require("./routes/services.routes"));
 const user_routes_1 = __importDefault(require("./routes/user.routes"));
 const menu_routes_1 = __importDefault(require("./routes/menu.routes"));
+const specialmenu_routes_1 = __importDefault(require("./routes/specialmenu.routes"));
+const booking_routes_1 = __importDefault(require("./routes/booking.routes"));
 dotenv_1.default.config();
 // Connect to DB
 (0, db_1.default)().catch((err) => {
@@ -41,6 +43,8 @@ app.use(apiPrefix, category_routes_1.default);
 app.use(apiPrefix, services_routes_1.default);
 app.use(apiPrefix, user_routes_1.default);
 app.use(apiPrefix, menu_routes_1.default);
+app.use(apiPrefix, specialmenu_routes_1.default);
+app.use(apiPrefix, booking_routes_1.default);
 app.use(apiPrefix, stateRoutes_1.default);
 // Server
 const PORT = process.env.PORT || 5000;
