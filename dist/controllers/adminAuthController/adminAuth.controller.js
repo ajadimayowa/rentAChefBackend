@@ -15,10 +15,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteAdmin = exports.updateAdmin = exports.getAdminDashboard = exports.getAdminById = exports.getAdmins = exports.createAdmin = exports.adminLogin = void 0;
 const Admin_1 = __importDefault(require("../../models/Admin"));
 const generateToken_1 = require("../../utils/generateToken");
-const Booking_1 = __importDefault(require("../../models/Booking"));
 const Chef_1 = __importDefault(require("../../models/Chef"));
 const User_model_1 = __importDefault(require("../../models/User.model"));
 const Category_1 = __importDefault(require("../../models/Category"));
+const Service_model_1 = require("../../models/Service.model");
+const Booking_1 = require("../../models/Booking");
 const adminLogin = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { email, password } = req.body;
@@ -37,9 +38,16 @@ const adminLogin = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         const categories = yield Category_1.default.find()
             .select('_id name') // only fetch what you need
             .lean();
+        const services = yield Service_model_1.Service.find()
+            .select('_id name') // only fetch what you need
+            .lean();
         const formattedCategories = categories.map(cat => ({
             label: cat.name,
             value: cat._id,
+        }));
+        const formattedServices = services.map(cat => ({
+            name: cat.name,
+            id: cat._id,
         }));
         res.status(200).json({
             success: true,
@@ -51,6 +59,7 @@ const adminLogin = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
                 email: admin.email,
                 role: admin.role,
                 formattedCategories,
+                formattedServices
             }
         });
     }
@@ -144,7 +153,7 @@ const getAdminById = (req, res) => __awaiter(void 0, void 0, void 0, function* (
 exports.getAdminById = getAdminById;
 const getAdminDashboard = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const bookings = yield Booking_1.default.find();
+        const bookings = yield Booking_1.Booking.find();
         const chefs = yield Chef_1.default.find();
         const customers = yield User_model_1.default.find();
         const grouped = {};

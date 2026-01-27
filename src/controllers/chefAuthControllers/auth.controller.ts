@@ -160,17 +160,18 @@ export const login = async (req: Request, res: Response): Promise<any> => {
     user.loginOtpExpires = otpExpires;
     await user.save();
 
+    console.log({seeOtp:otp})
     // Send OTP via email
-    try {
-      await sendLoginOtpEmail({
-        firstName: user.firstName,
-        email: user.email,
-        loginOtp: otp,
-      });
-    } catch (error) {
-      console.error("Error sending OTP email:", error);
-      // Don't block login flow if email fails, just log it
-    }
+    // try {
+    //   await sendLoginOtpEmail({
+    //     firstName: user.firstName,
+    //     email: user.email,
+    //     loginOtp: otp,
+    //   });
+    // } catch (error) {
+    //   console.error("Error sending OTP email:", error);
+    //   // Don't block login flow if email fails, just log it
+    // }
 
     return res.status(200).json({
       success: true,
@@ -249,14 +250,14 @@ export const verifyLoginOtp = async (req: Request, res: Response): Promise<any> 
 
     // Send OTP via email
     
-    try {
-        await sendLoginSuccessEmail({
-        firstName: customer.firstName,
-        email: customer.email,
-      });
-    } catch (error) {
-      console.log(error)
-    }
+    // try {
+    //     await sendLoginSuccessEmail({
+    //     firstName: customer.firstName,
+    //     email: customer.email,
+    //   });
+    // } catch (error) {
+    //   console.log(error)
+    // }
 
     return res.status(200).json({
       success: true,

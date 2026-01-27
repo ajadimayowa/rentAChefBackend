@@ -21,6 +21,7 @@ export const createChef = async (req: Request, res: Response): Promise<any> => {
             bio,
             phoneNumber,
             specialties,
+            servicesOffered,
             location,
             state,
             stateId,
@@ -31,7 +32,7 @@ export const createChef = async (req: Request, res: Response): Promise<any> => {
 
         // console.log({ adminSent: req.body });
 
-        if (!staffId || !name || !email || !location || !state || !category) {
+        if (!staffId || !name || !email || !location || !state||!servicesOffered || !category) {
             return res.status(400).json({ message: "staffId, category, location, state, name & email are required" });
         }
 
@@ -45,13 +46,13 @@ export const createChef = async (req: Request, res: Response): Promise<any> => {
         const pass = defaultPassword || "Chef@123";
         const hashedPassword = await bcrypt.hash(pass, 12);
 
-        // Parse specialties JSON
-        let specialtiesArray: string[] = [];
-        try {
-            specialtiesArray = specialties ? JSON.parse(specialties) : [];
-        } catch (err) {
-            return res.status(400).json({ message: "Invalid specialties format. Should be an array of strings." });
-        }
+        // // Parse specialties JSON
+        // let specialtiesArray: string[] = [];
+        // try {
+        //     specialtiesArray = specialties ? JSON.parse(specialties) : [];
+        // } catch (err) {
+        //     return res.status(400).json({ message: "Invalid specialties format. Should be an array of strings." });
+        // }
 
   //  const categoryName1 = await Category.findById(category).select("name");
         // Create chef
@@ -61,7 +62,8 @@ export const createChef = async (req: Request, res: Response): Promise<any> => {
             gender,
             email,
             bio,
-            specialties: specialtiesArray,
+            specialties,
+            servicesOffered,
             location,
             state,
             stateId,
@@ -213,6 +215,10 @@ export const getChefById = async (req: Request, res: Response): Promise<void> =>
 
     const chef = await Chef.findById(id)
       .select("-password") // ✅ exclude password
+      .populate({
+        path: "servicesOffered",
+        select: "_id name"
+      });
 
     if (!chef) {
       res.status(404).json({ success: false, message: "Chef not found" });

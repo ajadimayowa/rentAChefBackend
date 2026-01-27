@@ -1,137 +1,72 @@
 import { Request, Response } from "express";
 import { Service } from "../../models/Service.model";
-import Category from "../../models/Category";
+import { Types } from "mongoose";
 
-/**
- * CREATE SERVICE
- */
-export const createService = async (req: Request, res: Response) : Promise<any> => {
+/* ===================== SERVICE CRUD ===================== */
+
+// CREATE SERVICE
+export const createService = async (req: Request, res: Response): Promise<any> => {
+  const service = await Service.create(req.body);
+  res.status(201).json({ success: true, data: service });
+};
+
+// GET ALL SERVICES
+export const getServices = async (_req: Request, res: Response): Promise<any> => {
+  const services = await Service.find().populate("category", "name");
+  res.json({ success: true, payload: services });
+};
+
+// GET SINGLE SERVICE
+export const getServiceById = async (req: Request, res: Response): Promise<any> => {
+  const service = await Service.findById(req.params.id);
+  if (!service) return res.status(404).json({ message: "Not found" });
+  res.json({ success: true, data: service });
+};
+
+// UPDATE SERVICE
+export const updateService = async (req: Request, res: Response): Promise<any> => {
+  const service = await Service.findByIdAndUpdate(req.params.id, req.body, {
+    new: true,
+    runValidators: true,
+  });
+  res.json({ success: true, data: service });
+};
+
+// DELETE SERVICE
+export const deleteService = async (req: Request, res: Response): Promise<any> => {
+  await Service.findByIdAndDelete(req.params.id);
+  res.json({ success: true, message: "Deleted" });
+};
+
+/* ===================== SERVICE PLAN CRUD ===================== */
+
+// ADD SERVICE PLAN
+export const addServicePlan = async (
+  req: Request,
+  res: Response
+): Promise<any> => {
   try {
-    const { name, description, price, category, services = [] } = req.body;
+    const { services } = req.body;
 
-    // Validate category existence
-    const categoryExists = await Category.findById(category);
-    if (!categoryExists) {
-      return res.status(404).json({
+    if (!services || !Array.isArray(services) || services.length === 0) {
+      return res.status(400).json({
         success: false,
-        message: "Category not found",
+        message: "services must be a non-empty array",
       });
     }
 
-    const service = await Service.create({
-      name,
-      description,
-      price,
-      category,
-      services, // 👈 options allowed on create
-    });
-
-    return res.status(201).json({
-      success: true,
-      message: "Service created successfully",
-      payload: service,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Error creating service",
-      payload: error,
-    });
-  }
-};
-
-
-/**
- * GET ALL SERVICES
- */
-export const getAllServices = async (req: Request, res: Response) : Promise<any> => {
-  try {
-    const {
-      page = "1",
-      limit = "10",
-      categoryId,
-      priceSort, // asc | desc
-    } = req.query;
-
-    const pageNumber = Math.max(parseInt(page as string, 10), 1);
-    const pageSize = Math.max(parseInt(limit as string, 10), 1);
-    const skip = (pageNumber - 1) * pageSize;
-
-    // 🔎 Filters
-    const filter: any = {};
-    if (categoryId) {
-      filter.category = categoryId;
-    }
-
-    // 🔃 Sorting
-    const sort: any = {};
-    if (priceSort === "asc") sort.price = 1;
-    if (priceSort === "desc") sort.price = -1;
-
-    // Default sort (newest first)
-    if (!priceSort) sort.createdAt = -1;
-
-    const [services, total] = await Promise.all([
-      Service.find(filter)
-        .populate("category", "name slug")
-        .sort(sort)
-        .skip(skip)
-        .limit(pageSize),
-
-      Service.countDocuments(filter),
-    ]);
-
-    return res.status(200).json({
-      success: true,
-      meta: {
-        total,
-        page: pageNumber,
-        limit: pageSize,
-        totalPages: Math.ceil(total / pageSize),
+    const service = await Service.findByIdAndUpdate(
+      req.params.serviceId,
+      {
+        $push: {
+          services: { $each: services },
+        },
       },
-      payload: services,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Error fetching services",
-      payload: error,
-    });
-  }
-};
-
-
-/**
- * GET SERVICES BY CATEGORY
- */
-export const getServicesByCategory = async (req: Request, res: Response) : Promise<any> => {
-  try {
-    const { categoryId } = req.params;
-
-    const services = await Service.find({ category: categoryId })
-      .populate("category", "name slug");
-
-    return res.status(200).json({
-      success: true,
-      payload: services,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Error fetching services by category",
-      payload: error,
-    });
-  }
-};
-
-
-/**
- * GET SINGLE SERVICE
- */
-export const getServiceById = async (req: Request, res: Response) : Promise<any>=> {
-  try {
-    const service = await Service.findById(req.params.id)
-      .populate("category", "name slug");
+      {
+        new: true,
+        runValidators: true,
+      }
+    );
 
     if (!service) {
       return res.status(404).json({
@@ -142,74 +77,166 @@ export const getServiceById = async (req: Request, res: Response) : Promise<any>
 
     return res.status(200).json({
       success: true,
-      payload: service,
+      data: service,
     });
-  } catch (error) {
+  } catch (error: any) {
+    console.error(error);
     return res.status(500).json({
       success: false,
-      message: "Error fetching service",
-      payload: error,
+      message: error.message || "Failed to add service plan",
     });
   }
 };
 
+// UPDATE SERVICE PLAN
+export const updateServicePlan = async (req: Request, res: Response): Promise<any> => {
+  const { serviceId, planId } = req.params;
 
-/**
- * UPDATE SERVICE
- */
-export const updateService = async (req: Request, res: Response): Promise<any> => {
+  const service = await Service.findOneAndUpdate(
+    { _id: serviceId, "services._id": planId },
+    { $set: { "services.$": req.body } },
+    { new: true, runValidators: true }
+  );
+
+  res.json({ success: true, data: service });
+};
+
+// DELETE SERVICE PLAN
+export const deleteServicePlan = async (req: Request, res: Response): Promise<any> => {
+  const service = await Service.findByIdAndUpdate(
+    req.params.serviceId,
+    { $pull: { services: { _id: req.params.planId } } },
+    { new: true }
+  );
+  res.json({ success: true, data: service });
+};
+
+/* ===================== OPTIONS CRUD ===================== */
+
+// ADD OPTION
+export const addOption = async (
+  req: Request,
+  res: Response
+): Promise<any> => {
   try {
-    const updatedService = await Service.findByIdAndUpdate(
-      req.params.id,
-      req.body,
+    const { serviceId, planId } = req.params;
+    const { options } = req.body;
+
+    if (!options || !Array.isArray(options) || options.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "options must be a non-empty array",
+      });
+    }
+
+    const service = await Service.findOneAndUpdate(
+      { _id: serviceId, "services._id": planId },
+      {
+        $push: {
+          "services.$.options": { $each: options },
+        },
+      },
+      {
+        new: true,
+        runValidators: true,
+      }
+    );
+
+    if (!service) {
+      return res.status(404).json({
+        success: false,
+        message: "Service or service plan not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: service,
+    });
+  } catch (error: any) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to add options",
+    });
+  }
+};
+
+// UPDATE OPTION
+export const updateOption = async (req: Request, res: Response): Promise<any> => {
+  const { serviceId, planId, optionId } = req.params;
+
+  const service = await Service.findOneAndUpdate(
+    {
+      _id: serviceId,
+      "services._id": planId,
+      "services.options._id": optionId,
+    },
+    {
+      $set: {
+        "services.$[s].options.$[o]": req.body,
+      },
+    },
+    {
+      arrayFilters: [
+        { "s._id": planId },
+        { "o._id": optionId },
+      ],
+      new: true,
+      runValidators: true,
+    }
+  );
+
+  res.json({ success: true, data: service });
+};
+
+export const updateOptions = async (
+  req: Request,
+  res: Response
+): Promise<any> => {
+  try {
+    const { serviceId, planId } = req.params;
+    const { options } = req.body;
+
+    if (!Array.isArray(options)) {
+      return res.status(400).json({
+        success: false,
+        message: "options must be an array",
+      });
+    }
+
+    const service = await Service.findOneAndUpdate(
+      { _id: serviceId, "services._id": planId },
+      {
+        $set: {
+          "services.$.options": options, // 🔥 overwrite instead of push
+        },
+      },
       { new: true, runValidators: true }
     );
 
-    if (!updatedService) {
+    if (!service) {
       return res.status(404).json({
         success: false,
-        message: "Service not found",
+        message: "Service plan not found",
       });
     }
 
-    return res.status(200).json({
-      success: true,
-      message: "Service updated successfully",
-      payload: updatedService,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Error updating service",
-      payload: error,
-    });
+    res.json({ success: true, data: service });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
+// DELETE OPTION
+export const deleteOption = async (req: Request, res: Response) => {
+  const { serviceId, planId, optionId } = req.params;
 
-/**
- * DELETE SERVICE
- */
-export const deleteService = async (req: Request, res: Response): Promise<any> => {
-  try {
-    const deletedService = await Service.findByIdAndDelete(req.params.id);
+  const service = await Service.findOneAndUpdate(
+    { _id: serviceId, "services._id": planId },
+    { $pull: { "services.$.options": { _id: optionId } } },
+    { new: true }
+  );
 
-    if (!deletedService) {
-      return res.status(404).json({
-        success: false,
-        message: "Service not found",
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: "Service deleted successfully",
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Error deleting service",
-      payload: error,
-    });
-  }
+  res.json({ success: true, data: service });
 };

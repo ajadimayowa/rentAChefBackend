@@ -147,18 +147,18 @@ const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         user.loginOtp = otp;
         user.loginOtpExpires = otpExpires;
         yield user.save();
+        console.log({ seeOtp: otp });
         // Send OTP via email
-        try {
-            yield (0, usersEmailNotifs_1.sendLoginOtpEmail)({
-                firstName: user.firstName,
-                email: user.email,
-                loginOtp: otp,
-            });
-        }
-        catch (error) {
-            console.error("Error sending OTP email:", error);
-            // Don't block login flow if email fails, just log it
-        }
+        // try {
+        //   await sendLoginOtpEmail({
+        //     firstName: user.firstName,
+        //     email: user.email,
+        //     loginOtp: otp,
+        //   });
+        // } catch (error) {
+        //   console.error("Error sending OTP email:", error);
+        //   // Don't block login flow if email fails, just log it
+        // }
         return res.status(200).json({
             success: true,
             message: "OTP sent to email.",
@@ -223,15 +223,14 @@ const verifyLoginOtp = (req, res) => __awaiter(void 0, void 0, void 0, function*
         // Optionally generate a JWT token
         const token = jsonwebtoken_1.default.sign({ id: customer._id, email: customer.email, isAdmin: customer.isAdmin }, process.env.JWT_SECRET, { expiresIn: "7d" });
         // Send OTP via email
-        try {
-            yield (0, usersEmailNotifs_1.sendLoginSuccessEmail)({
-                firstName: customer.firstName,
-                email: customer.email,
-            });
-        }
-        catch (error) {
-            console.log(error);
-        }
+        // try {
+        //     await sendLoginSuccessEmail({
+        //     firstName: customer.firstName,
+        //     email: customer.email,
+        //   });
+        // } catch (error) {
+        //   console.log(error)
+        // }
         return res.status(200).json({
             success: true,
             message: "Login OTP verified successfully.",

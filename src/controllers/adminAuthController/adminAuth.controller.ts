@@ -1,25 +1,26 @@
 import { Request, Response } from "express";
 import Admin from "../../models/Admin";
 import { generateToken } from "../../utils/generateToken";
-import Booking from "../../models/Booking";
 import Chef from "../../models/Chef";
 import UserModel from "../../models/User.model";
 import Category from "../../models/Category";
+import { Service } from "../../models/Service.model";
+import { Booking } from "../../models/Booking";
 
-export const adminLogin = async (req: Request, res: Response):Promise<any> => {
+export const adminLogin = async (req: Request, res: Response): Promise<any> => {
   try {
     const { email, password } = req.body;
 
     const admin = await Admin.findOne({ email });
     if (!admin)
-      return res.status(401).json({success:false, message: "Invalid credentials" });
+      return res.status(401).json({ success: false, message: "Invalid credentials" });
 
     if (!admin.isActive)
-      return res.status(403).json({success:false, message: "Admin account disabled" });
+      return res.status(403).json({ success: false, message: "Admin account disabled" });
 
     const isMatch = await admin.comparePassword(password);
     if (!isMatch)
-      return res.status(401).json({success:false, message: "Invalid credentials" });
+      return res.status(401).json({ success: false, message: "Invalid credentials" });
 
     const token = generateToken({
       id: admin._id,
@@ -27,15 +28,24 @@ export const adminLogin = async (req: Request, res: Response):Promise<any> => {
     });
 
     const categories = await Category.find()
-  .select('_id name') // only fetch what you need
-  .lean();
+      .select('_id name') // only fetch what you need
+      .lean();
 
-const formattedCategories = categories.map(cat => ({
-  label: cat.name,
-  value: cat._id,
-}));
+    const services = await Service.find()
+      .select('_id name') // only fetch what you need
+      .lean();
+
+    const formattedCategories = categories.map(cat => ({
+      label: cat.name,
+      value: cat._id,
+    }));
+
+    const formattedServices = services.map(cat => ({
+      name: cat.name,
+      id: cat._id,
+    }));
     res.status(200).json({
-      success:true,
+      success: true,
       message: "Login successful",
       token,
       payload: {
@@ -44,14 +54,15 @@ const formattedCategories = categories.map(cat => ({
         email: admin.email,
         role: admin.role,
         formattedCategories,
+        formattedServices
       }
     });
   } catch (error) {
-    res.status(500).json({ success:false,message: "Server error",error: error });
+    res.status(500).json({ success: false, message: "Server error", error: error });
   }
 };
 
-export const createAdmin = async (req: Request, res: Response):Promise<any> => {
+export const createAdmin = async (req: Request, res: Response): Promise<any> => {
   try {
     const { fullName, email, password, role } = req.body;
 
@@ -81,7 +92,7 @@ export const createAdmin = async (req: Request, res: Response):Promise<any> => {
 };
 
 
-export const getAdmins = async (req: Request, res: Response):Promise<any> => {
+export const getAdmins = async (req: Request, res: Response): Promise<any> => {
   try {
     const page = Math.max(Number(req.query.page) || 1, 1);
     const limit = Math.max(Number(req.query.limit) || 10, 1);
@@ -115,7 +126,7 @@ export const getAdmins = async (req: Request, res: Response):Promise<any> => {
   }
 };
 
-export const getAdminById = async (req: Request, res: Response):Promise<any>  => {
+export const getAdminById = async (req: Request, res: Response): Promise<any> => {
   try {
     const admin = await Admin.findById(req.params.id).select("-password");
 
@@ -139,8 +150,8 @@ export const getAdminById = async (req: Request, res: Response):Promise<any>  =>
   }
 };
 
-export const getAdminDashboard = async (req: Request, res: Response):Promise<any>  => {
-  
+export const getAdminDashboard = async (req: Request, res: Response): Promise<any> => {
+
   try {
     const bookings = await Booking.find();
     const chefs = await Chef.find();
@@ -171,13 +182,13 @@ export const getAdminDashboard = async (req: Request, res: Response):Promise<any
     return res.status(200).json({
       success: true,
       payload: {
-        cardData:{
-          revenue:500000,
-        customers:customers.length,
-        chefs:chefs.length
+        cardData: {
+          revenue: 500000,
+          customers: customers.length,
+          chefs: chefs.length
         },
         bookings: chartData
-          
+
       },
     });
   } catch (error) {
@@ -194,7 +205,7 @@ export const getAdminDashboard = async (req: Request, res: Response):Promise<any
  * UPDATE ADMIN
  * =====================
  */
-export const updateAdmin = async (req: Request, res: Response):Promise<any>  => {
+export const updateAdmin = async (req: Request, res: Response): Promise<any> => {
   try {
     const { fullName, email, role, isActive, password } = req.body;
 
@@ -248,7 +259,7 @@ export const updateAdmin = async (req: Request, res: Response):Promise<any>  => 
  * DELETE ADMIN
  * =====================
  */
-export const deleteAdmin = async (req: Request, res: Response):Promise<any>  => {
+export const deleteAdmin = async (req: Request, res: Response): Promise<any> => {
   try {
     const admin = await Admin.findByIdAndDelete(req.params.id);
 

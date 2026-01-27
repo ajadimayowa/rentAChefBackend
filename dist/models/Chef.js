@@ -18,6 +18,7 @@ const ChefSchema = new mongoose_1.Schema({
         ref: "Category",
         required: true,
     },
+    servicesOffered: [{ type: mongoose_1.Schema.Types.ObjectId, ref: "Service" }],
     phoneNumber: { type: Number, required: true },
     location: { type: String, required: true },
     state: { type: String, required: true },
