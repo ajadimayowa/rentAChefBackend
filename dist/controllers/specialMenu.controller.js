@@ -37,11 +37,13 @@ const createSpecialMenu = (req, res) => __awaiter(void 0, void 0, void 0, functi
         /** Mongoose validation errors */
         if (error.name === "ValidationError") {
             return res.status(400).json({
+                success: false,
                 message: "Validation failed",
                 errors: Object.values(error.errors).map((err) => err.message),
             });
         }
         res.status(500).json({
+            success: false,
             message: "Failed to create special menu",
             error: error.message,
         });
@@ -80,10 +82,10 @@ const updateSpecialMenu = (req, res) => __awaiter(void 0, void 0, void 0, functi
         if (!menu) {
             return res.status(404).json({ message: "Special menu not found" });
         }
-        res.status(200).json(menu);
+        res.status(200).json({ success: true, payload: menu });
     }
     catch (error) {
-        res.status(400).json({ message: error.message });
+        res.status(400).json({ success: false, message: error.message });
     }
 });
 exports.updateSpecialMenu = updateSpecialMenu;
@@ -92,9 +94,9 @@ const deleteSpecialMenu = (req, res) => __awaiter(void 0, void 0, void 0, functi
     try {
         const menu = yield SpecialMenu_1.SpecialMenu.findByIdAndDelete(req.params.id);
         if (!menu) {
-            return res.status(404).json({ message: "Special menu not found" });
+            return res.status(404).json({ success: false, message: "Special menu not found" });
         }
-        res.status(200).json({ message: "Special menu deleted successfully" });
+        res.status(200).json({ success: true, message: "Special menu deleted successfully" });
     }
     catch (error) {
         res.status(400).json({ message: error.message });

@@ -1,18 +1,27 @@
 import { Router } from "express";
 import {
   createBooking,
-  getAllBookings,
-  getBookingById,
+  getBookings,
+  getBooking,
   updateBooking,
-  deleteBooking,
+  deleteBooking
 } from "../controllers/booking.controller";
+import { verifyUserToken } from "../middleware/auth.middleware";
 
 const router = Router();
 
-router.post("/", createBooking);          // Create booking
-router.get("/", getAllBookings);           // Get all bookings
-router.get("/:id", getBookingById);        // Get booking by ID
-router.put("/:id", updateBooking);         // Update booking
-router.delete("/:id", deleteBooking);      // Delete booking
+router.post("/booking/create",verifyUserToken, createBooking);
+
+/* GET ALL BOOKINGS */
+router.get("/bookings", getBookings);
+
+/* GET SINGLE BOOKING */
+router.get("/booking/:id", getBooking);
+
+/* UPDATE BOOKING */
+router.put("/booking/:id", updateBooking);
+
+/* DELETE BOOKING */
+router.delete("/booking/:id", deleteBooking);
 
 export default router;

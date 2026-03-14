@@ -67,10 +67,6 @@ const categorySchema = new mongoose_1.Schema({
         type: String,
         default: "",
     },
-    services: {
-        type: [categoryServiceSchema],
-        default: [],
-    },
     isActive: {
         type: Boolean,
         default: true,

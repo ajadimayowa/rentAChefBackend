@@ -12,19 +12,22 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteChef = exports.disableChef = exports.updateChef = exports.getChefById = exports.getAllChefs = exports.loginChef = exports.createChef = void 0;
+exports.checkChefAvailability = exports.deleteChef = exports.disableChef = exports.updateChef = exports.getChefById = exports.getAllChefs = exports.changeChefPasswordWithOtp = exports.requestChefPasswordChangeOtp = exports.loginChef = exports.createChef = void 0;
 const Chef_1 = __importDefault(require("../models/Chef"));
 const mongoose_1 = __importDefault(require("mongoose"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
+const usersEmailNotifs_1 = require("../services/email/rentAChef/usersEmailNotifs");
 const chefsEmailNotification_1 = require("../services/email/rentAChef/chefsEmailNotification");
 const Category_1 = __importDefault(require("../models/Category"));
+const otpUtils_1 = require("../utils/otpUtils");
+const checkChefAvailability_1 = require("../utils/checkChefAvailability");
 const createChef = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const chefPic = req.file; // multer file
-        const { staffId, name, gender, email, bio, phoneNumber, specialties, servicesOffered, location, state, stateId, defaultPassword, category, categoryName, } = req.body;
+        const { staffId, name, gender, email, bio, phoneNumber, specialties, location, state, stateId, defaultPassword, category, yearsOfExperience, rating, dob } = req.body;
         // console.log({ adminSent: req.body });
-        if (!staffId || !name || !email || !location || !state || !servicesOffered || !category) {
+        if (!staffId || !name || !email || !location || !state || !category) {
             return res.status(400).json({ message: "staffId, category, location, state, name & email are required" });
         }
         // Check if chef already exists
@@ -51,7 +54,6 @@ const createChef = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             email,
             bio,
             specialties,
-            servicesOffered,
             location,
             state,
             stateId,
@@ -61,7 +63,9 @@ const createChef = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             isActive: true,
             isPasswordUpdated: false,
             category,
-            categoryName
+            yearsOfExperience,
+            rating,
+            dob,
         });
         try {
             yield (0, chefsEmailNotification_1.sendChefCreationSuccessEmail)({
@@ -101,9 +105,10 @@ const loginChef = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         // Generate JWT token
         const token = jsonwebtoken_1.default.sign({ id: chef._id, email: chef.email, staffId: chef.staffId }, process.env.JWT_SECRET || "your_jwt_secret", { expiresIn: "7d" });
         return res.status(200).json({
+            success: true,
             message: "Login successful",
             token,
-            chef: {
+            payload: {
                 id: chef._id,
                 staffId: chef.staffId,
                 name: chef.name,
@@ -119,6 +124,85 @@ const loginChef = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     }
 });
 exports.loginChef = loginChef;
+/**
+ * REQUEST PASSWORD CHANGE OTP
+ */
+const requestChefPasswordChangeOtp = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { email } = req.body;
+        const chef = yield Chef_1.default.findOne({ email });
+        if (!chef) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        const otp = (0, otpUtils_1.generateOtp)();
+        chef.loginOtp = otp;
+        chef.loginOtpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+        yield chef.save();
+        // await sendEmail(
+        //   user.email,
+        //   'Password Reset OTP',
+        //   `Your password reset OTP is ${otp}. It expires in 10 minutes.`
+        // );
+        // Send OTP via email
+        try {
+            yield (0, usersEmailNotifs_1.sendUserPasswordResetOTPEmail)({
+                firstName: chef.name,
+                email: chef.email,
+                loginOtp: otp,
+            });
+        }
+        catch (error) {
+            console.error("Error sending OTP email:", error);
+            // Don't block login flow if email fails, just log it
+        }
+        return res.status(200).json({
+            success: true,
+            message: 'Password reset OTP sent to email',
+        });
+    }
+    catch (error) {
+        return res.status(500).json({ message: 'Server error' });
+    }
+});
+exports.requestChefPasswordChangeOtp = requestChefPasswordChangeOtp;
+const changeChefPasswordWithOtp = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { email, otp, newPassword } = req.body;
+        const chef = yield Chef_1.default.findOne({ email });
+        if (!chef || !chef.loginOtp || !chef.loginOtpExpires) {
+            return res.status(400).json({ message: 'Invalid request' });
+        }
+        if (chef.loginOtp !== otp) {
+            return res.status(400).json({ message: 'Invalid OTP' });
+        }
+        if (chef.loginOtpExpires < new Date()) {
+            return res.status(400).json({ message: 'OTP expired' });
+        }
+        const hashedPassword = yield bcryptjs_1.default.hash(newPassword, 10);
+        chef.password = hashedPassword;
+        // clear otp
+        chef.loginOtp = undefined;
+        chef.loginOtpExpires = undefined;
+        yield chef.save();
+        try {
+            yield (0, usersEmailNotifs_1.sendPasswordChangeSuccessEmail)({
+                firstName: chef.name,
+                email: chef.name,
+            });
+        }
+        catch (error) {
+            console.log(error);
+        }
+        return res.status(200).json({
+            success: true,
+            message: 'Password changed successfully',
+        });
+    }
+    catch (error) {
+        return res.status(500).json({ message: 'Server error' });
+    }
+});
+exports.changeChefPasswordWithOtp = changeChefPasswordWithOtp;
 const getAllChefs = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         // Pagination
@@ -144,6 +228,7 @@ const getAllChefs = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         // Query
         const [chefs, total] = yield Promise.all([
             Chef_1.default.find(filter)
+                .populate("category name")
                 .select("-password")
                 .sort({ createdAt: -1 })
                 .skip(skip)
@@ -180,10 +265,7 @@ const getChefById = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         }
         const chef = yield Chef_1.default.findById(id)
             .select("-password") // ✅ exclude password
-            .populate({
-            path: "servicesOffered",
-            select: "_id name"
-        });
+            .populate('category name');
         if (!chef) {
             res.status(404).json({ success: false, message: "Chef not found" });
             return;
@@ -227,6 +309,10 @@ const updateChef = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             "stateId",
             "staffId",
             "profilePic",
+            "dob",
+            "yearsOfExperience",
+            "password",
+            "rating"
         ];
         const updates = {};
         for (const key of allowedUpdates) {
@@ -248,7 +334,7 @@ const updateChef = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         const chef = yield Chef_1.default.findByIdAndUpdate(id, updates, {
             new: true,
             runValidators: true,
-        }).populate("category", "name");
+        }).populate("category", "name").select("-password");
         if (!chef) {
             return res.status(404).json({ success: false, message: "Chef not found" });
         }
@@ -301,3 +387,34 @@ const deleteChef = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
     }
 });
 exports.deleteChef = deleteChef;
+// Controller function to check chef availability
+const checkChefAvailability = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { chefId, startDate, endDate } = req.body;
+        if (!chefId || !startDate || !endDate) {
+            return res.status(400).json({
+                success: false,
+                message: "chefId, startDate and endDate are required"
+            });
+        }
+        const available = yield (0, checkChefAvailability_1.isChefAvailable)(chefId, new Date(startDate), new Date(endDate));
+        if (!available) {
+            return res.status(409).json({
+                success: false,
+                message: "Chef is not available for the selected dates"
+            });
+        }
+        return res.status(200).json({
+            success: true,
+            message: "Chef is available"
+        });
+    }
+    catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: "Server error",
+            error
+        });
+    }
+});
+exports.checkChefAvailability = checkChefAvailability;

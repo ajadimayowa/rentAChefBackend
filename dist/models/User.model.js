@@ -11,8 +11,35 @@ const UserModel = new mongoose_1.Schema({
     fullName: { type: String },
     firstName: { type: String },
     phone: { type: String },
+    maritalStatus: { type: String, enum: ['Single', 'Married', 'Divorced', 'Widowed'] },
+    gender: { type: String, enum: ['m', 'f'] },
     isAdmin: { type: Boolean, default: false },
-    createdAt: { type: Date, default: Date.now }
+    createdAt: { type: Date, default: Date.now },
+    profilePic: { type: String }, // Added optional profilePic
+    dob: { type: Date }, // Added optional profilePic
+    location: {
+        home: { type: String },
+        office: { type: String },
+        state: { type: String },
+        city: { type: String },
+        long: { type: String },
+        lat: { type: String },
+    },
+    kyc: {
+        idType: { type: String },
+        idNumber: { type: String },
+        idPicture: { type: String },
+        isVerified: { type: Boolean, default: false }
+    },
+    nok: {
+        fullName: { type: String },
+        phone: { type: String },
+        relationship: { type: String }
+    },
+    healthInformation: {
+        allergies: { type: [String] },
+        healthDetails: { type: String },
+    }
 }, {
     timestamps: true,
     toJSON: {

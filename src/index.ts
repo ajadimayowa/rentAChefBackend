@@ -10,10 +10,14 @@ import adminRoutes from './routes/admin.routes'
 import chefRoutes from './routes/chef.route'
 import categoryRoutes from './routes/category.routes';
 import serviceRoutes from './routes/services.routes';
+import chefServiceRoutes from './routes/chefService.routes';
+import servicePricingRoutes from './routes/servicepricing.route';
 import userRoutes from './routes/user.routes'
 import menuRoutes from './routes/menu.routes';
+import paymentRoutes from './routes/payment.routes';
 import specialMenuRoutes from './routes/specialmenu.routes';
 import bookingRoutes from './routes/booking.routes'
+import quoteRoutes from './routes/quote.routes'
 
 
 dotenv.config();
@@ -45,8 +49,12 @@ app.use(apiPrefix, adminRoutes);
 app.use(apiPrefix, chefRoutes);
 app.use(apiPrefix, categoryRoutes);
 app.use(apiPrefix, serviceRoutes);
+app.use(apiPrefix, chefServiceRoutes);
+app.use(apiPrefix, servicePricingRoutes);
 app.use(apiPrefix, userRoutes);
 app.use(apiPrefix, menuRoutes);
+app.use(apiPrefix, quoteRoutes);
+app.use(apiPrefix, paymentRoutes);
 app.use(apiPrefix, specialMenuRoutes);
 app.use(apiPrefix, bookingRoutes);
 app.use(apiPrefix, stateRoutes);

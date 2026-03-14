@@ -6,10 +6,13 @@ export interface IChef extends Document {
   gender: 'm' | 'f'
   email: string;
   bio?: string;
+  dob?:Date;
+  
+  yearsOfExperience?: number,
+  rating?: number,
+
   specialties: string[];
   category: Types.ObjectId;
-  servicesOffered:Types.ObjectId[];
-  categoryName: string;
   phoneNumber: number;
   location?: string;
   state: string,
@@ -17,6 +20,8 @@ export interface IChef extends Document {
   profilePic?: string;
   menus: Types.ObjectId[];
   password?: string | null;
+  loginOtp?:string;
+  loginOtpExpires:Date | undefined;
   isPasswordUpdated: boolean;
   isActive: boolean;
   createdAt: Date;
@@ -33,23 +38,26 @@ const ChefSchema = new Schema<IChef>({
   email: { type: String, required: true },
   bio: { type: String },
   specialties: { type: [String], default: [] },
-  categoryName: { type: String, required: true },
   category: {
     type: Schema.Types.ObjectId,
     ref: "Category",
     required: true,
   },
-  servicesOffered: [{ type: Schema.Types.ObjectId, ref: "Service" }],
   phoneNumber: { type: Number, required: true },
   location: { type: String, required: true },
   state: { type: String, required: true },
   stateId: { type: Number, required: true },
   profilePic: { type: String },
   menus: [{ type: Schema.Types.ObjectId, ref: "Menu" }],
+  loginOtp: { type: String },
+  loginOtpExpires: { type: Date },
   password: { type: String, default: null },
   isPasswordUpdated: { type: Boolean, default: false },
   isActive: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now },
+  dob: { type: Date},
+  yearsOfExperience: { type: Number, default: 7},
+  rating: { type: Number, default: 2},
 }, {
   timestamps: true,
   toJSON: {

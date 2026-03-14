@@ -9,190 +9,138 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteOption = exports.updateOptions = exports.updateOption = exports.addOption = exports.deleteServicePlan = exports.updateServicePlan = exports.addServicePlan = exports.deleteService = exports.updateService = exports.getServiceById = exports.getServices = exports.createService = void 0;
-const Service_model_1 = require("../../models/Service.model");
+exports.deleteService = exports.updateService = exports.getServiceById = exports.getServices = exports.createService = void 0;
+const Service_1 = require("../../models/Service");
 /* ===================== SERVICE CRUD ===================== */
 // CREATE SERVICE
 const createService = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const service = yield Service_model_1.Service.create(req.body);
-    res.status(201).json({ success: true, data: service });
+    try {
+        const { name, description, isActive } = req.body;
+        // 1️⃣ Validate input
+        if (!name || typeof name !== "string") {
+            return res.status(400).json({ success: false, message: "Service name is required" });
+        }
+        // 2️⃣ Check for duplicate
+        const existingService = yield Service_1.Service.findOne({ name: name.trim() });
+        if (existingService) {
+            return res.status(409).json({ success: false, message: "Service already exists" });
+        }
+        // 3️⃣ Create the service
+        const service = yield Service_1.Service.create({
+            name: name.trim(),
+            description: description || "",
+            isActive: isActive !== undefined ? isActive : true,
+        });
+        // 4️⃣ Respond with the created service
+        return res.status(201).json({ success: true, data: service });
+    }
+    catch (error) {
+        console.error("Error creating service:", error);
+        return res.status(500).json({ success: false, message: "Server error" });
+    }
 });
 exports.createService = createService;
 // GET ALL SERVICES
-const getServices = (_req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const services = yield Service_model_1.Service.find().populate("category", "name");
-    res.json({ success: true, payload: services });
+const getServices = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { status, search, page = 1, limit = 20 } = req.query;
+        // Build query object
+        const query = {};
+        // 1️⃣ Filter by status
+        if (status === "active")
+            query.isActive = true;
+        if (status === "inactive")
+            query.isActive = false;
+        // 2️⃣ Search by name (case-insensitive)
+        if (search && typeof search === "string") {
+            query.name = { $regex: search, $options: "i" }; // partial match
+        }
+        // 3️⃣ Pagination
+        const skip = (Number(page) - 1) * Number(limit);
+        const services = yield Service_1.Service.find(query)
+            .skip(skip)
+            .limit(Number(limit))
+            .sort({ name: 1 }); // sort alphabetically by name
+        const total = yield Service_1.Service.countDocuments(query);
+        return res.status(200).json({
+            success: true,
+            payload: services,
+            meta: {
+                total,
+                page: Number(page),
+                limit: Number(limit),
+                totalPages: Math.ceil(total / Number(limit)),
+            },
+        });
+    }
+    catch (error) {
+        console.error("Error fetching services:", error);
+        return res.status(500).json({ success: false, message: "Server error" });
+    }
 });
 exports.getServices = getServices;
 // GET SINGLE SERVICE
+// GET SINGLE SERVICE
 const getServiceById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const service = yield Service_model_1.Service.findById(req.params.id);
-    if (!service)
-        return res.status(404).json({ message: "Not found" });
-    res.json({ success: true, data: service });
+    try {
+        const { id } = req.params;
+        const service = yield Service_1.Service.findById(id).lean();
+        if (!service) {
+            return res.status(404).json({ success: false, message: "Service not found" });
+        }
+        return res.status(200).json({ success: true, data: service });
+    }
+    catch (error) {
+        console.error("Error fetching service:", error);
+        return res.status(500).json({ success: false, message: "Server error" });
+    }
 });
 exports.getServiceById = getServiceById;
 // UPDATE SERVICE
 const updateService = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const service = yield Service_model_1.Service.findByIdAndUpdate(req.params.id, req.body, {
-        new: true,
-        runValidators: true,
-    });
-    res.json({ success: true, data: service });
+    try {
+        const { id } = req.params;
+        const { name, description, isActive } = req.body;
+        const service = yield Service_1.Service.findById(id);
+        if (!service) {
+            return res.status(404).json({ success: false, message: "Service not found" });
+        }
+        // Update fields if provided
+        if (name)
+            service.name = name.trim();
+        if (description !== undefined)
+            service.description = description;
+        if (isActive !== undefined)
+            service.isActive = isActive;
+        yield service.save();
+        return res.status(200).json({ success: true, data: service });
+    }
+    catch (error) {
+        console.error("Error updating service:", error);
+        return res.status(500).json({ success: false, message: "Server error" });
+    }
 });
 exports.updateService = updateService;
-// DELETE SERVICE
 const deleteService = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    yield Service_model_1.Service.findByIdAndDelete(req.params.id);
-    res.json({ success: true, message: "Deleted" });
+    try {
+        const { id } = req.params;
+        // Option 1: find and delete
+        const service = yield Service_1.Service.findByIdAndDelete(id);
+        if (!service) {
+            return res.status(404).json({ success: false, message: "Service not found" });
+        }
+        return res.status(200).json({ success: true, message: "Service deleted successfully" });
+        // -----------------------------
+        // Option 2: soft delete (recommended)
+        // const service = await Service.findById(id);
+        // if (!service) return res.status(404).json({ success: false, message: "Service not found" });
+        // service.isActive = false;
+        // await service.save();
+        // return res.status(200).json({ success: true, message: "Service deactivated successfully" });
+    }
+    catch (error) {
+        console.error("Error deleting service:", error);
+        return res.status(500).json({ success: false, message: "Server error" });
+    }
 });
 exports.deleteService = deleteService;
-/* ===================== SERVICE PLAN CRUD ===================== */
-// ADD SERVICE PLAN
-const addServicePlan = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { services } = req.body;
-        if (!services || !Array.isArray(services) || services.length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: "services must be a non-empty array",
-            });
-        }
-        const service = yield Service_model_1.Service.findByIdAndUpdate(req.params.serviceId, {
-            $push: {
-                services: { $each: services },
-            },
-        }, {
-            new: true,
-            runValidators: true,
-        });
-        if (!service) {
-            return res.status(404).json({
-                success: false,
-                message: "Service not found",
-            });
-        }
-        return res.status(200).json({
-            success: true,
-            data: service,
-        });
-    }
-    catch (error) {
-        console.error(error);
-        return res.status(500).json({
-            success: false,
-            message: error.message || "Failed to add service plan",
-        });
-    }
-});
-exports.addServicePlan = addServicePlan;
-// UPDATE SERVICE PLAN
-const updateServicePlan = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { serviceId, planId } = req.params;
-    const service = yield Service_model_1.Service.findOneAndUpdate({ _id: serviceId, "services._id": planId }, { $set: { "services.$": req.body } }, { new: true, runValidators: true });
-    res.json({ success: true, data: service });
-});
-exports.updateServicePlan = updateServicePlan;
-// DELETE SERVICE PLAN
-const deleteServicePlan = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const service = yield Service_model_1.Service.findByIdAndUpdate(req.params.serviceId, { $pull: { services: { _id: req.params.planId } } }, { new: true });
-    res.json({ success: true, data: service });
-});
-exports.deleteServicePlan = deleteServicePlan;
-/* ===================== OPTIONS CRUD ===================== */
-// ADD OPTION
-const addOption = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { serviceId, planId } = req.params;
-        const { options } = req.body;
-        if (!options || !Array.isArray(options) || options.length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: "options must be a non-empty array",
-            });
-        }
-        const service = yield Service_model_1.Service.findOneAndUpdate({ _id: serviceId, "services._id": planId }, {
-            $push: {
-                "services.$.options": { $each: options },
-            },
-        }, {
-            new: true,
-            runValidators: true,
-        });
-        if (!service) {
-            return res.status(404).json({
-                success: false,
-                message: "Service or service plan not found",
-            });
-        }
-        return res.status(200).json({
-            success: true,
-            data: service,
-        });
-    }
-    catch (error) {
-        console.error(error);
-        return res.status(500).json({
-            success: false,
-            message: error.message || "Failed to add options",
-        });
-    }
-});
-exports.addOption = addOption;
-// UPDATE OPTION
-const updateOption = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { serviceId, planId, optionId } = req.params;
-    const service = yield Service_model_1.Service.findOneAndUpdate({
-        _id: serviceId,
-        "services._id": planId,
-        "services.options._id": optionId,
-    }, {
-        $set: {
-            "services.$[s].options.$[o]": req.body,
-        },
-    }, {
-        arrayFilters: [
-            { "s._id": planId },
-            { "o._id": optionId },
-        ],
-        new: true,
-        runValidators: true,
-    });
-    res.json({ success: true, data: service });
-});
-exports.updateOption = updateOption;
-const updateOptions = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { serviceId, planId } = req.params;
-        const { options } = req.body;
-        if (!Array.isArray(options)) {
-            return res.status(400).json({
-                success: false,
-                message: "options must be an array",
-            });
-        }
-        const service = yield Service_model_1.Service.findOneAndUpdate({ _id: serviceId, "services._id": planId }, {
-            $set: {
-                "services.$.options": options, // 🔥 overwrite instead of push
-            },
-        }, { new: true, runValidators: true });
-        if (!service) {
-            return res.status(404).json({
-                success: false,
-                message: "Service plan not found",
-            });
-        }
-        res.json({ success: true, data: service });
-    }
-    catch (error) {
-        res.status(500).json({ success: false, message: error.message });
-    }
-});
-exports.updateOptions = updateOptions;
-// DELETE OPTION
-const deleteOption = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { serviceId, planId, optionId } = req.params;
-    const service = yield Service_model_1.Service.findOneAndUpdate({ _id: serviceId, "services._id": planId }, { $pull: { "services.$.options": { _id: optionId } } }, { new: true });
-    res.json({ success: true, data: service });
-});
-exports.deleteOption = deleteOption;

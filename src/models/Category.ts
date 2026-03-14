@@ -53,10 +53,6 @@ const categorySchema = new Schema<ICategory>(
       type: String,
       default: "",
     },
-    services: {
-      type: [categoryServiceSchema],
-      default: [],
-    },
     isActive: {
       type: Boolean,
       default: true,
