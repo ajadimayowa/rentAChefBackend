@@ -4,7 +4,7 @@ import { generateToken } from "../../utils/generateToken";
 import Chef from "../../models/Chef";
 import UserModel from "../../models/User.model";
 import Category from "../../models/Category";
-import { Service } from "../../models/Service.model";
+import { Service } from "../../models/Service";
 import { Booking } from "../../models/Booking";
 
 export const adminLogin = async (req: Request, res: Response): Promise<any> => {
@@ -157,8 +157,8 @@ export const getAdminDashboard = async (req: Request, res: Response): Promise<an
     const chefs = await Chef.find();
     const customers = await UserModel.find();
     const grouped: Record<string, number> = {};
-    bookings.forEach((booking) => {
-      const day = booking.createdAt.toLocaleDateString('en-US', {
+    bookings.forEach((booking:any) => {
+      const day = booking?.createdAt.toLocaleDateString('en-US', {
         weekday: 'short',
       });
 

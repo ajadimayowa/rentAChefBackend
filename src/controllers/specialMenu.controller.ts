@@ -33,6 +33,7 @@ export const createSpecialMenu = async (req: Request, res: Response):Promise<any
         /** Mongoose validation errors */
         if (error.name === "ValidationError") {
             return res.status(400).json({
+                success:false,
                 message: "Validation failed",
                 errors: Object.values(error.errors).map(
                     (err: any) => err.message
@@ -41,6 +42,7 @@ export const createSpecialMenu = async (req: Request, res: Response):Promise<any
         }
 
         res.status(500).json({
+            success:false,
             message: "Failed to create special menu",
             error: error.message,
         });
@@ -83,9 +85,9 @@ export const updateSpecialMenu = async (req: Request, res: Response):Promise<any
             return res.status(404).json({ message: "Special menu not found" });
         }
 
-        res.status(200).json(menu);
+        res.status(200).json({success:true,payload:menu});
     } catch (error: any) {
-        res.status(400).json({ message: error.message });
+        res.status(400).json({success:false, message: error.message });
     }
 };
 
@@ -95,10 +97,10 @@ export const deleteSpecialMenu = async (req: Request, res: Response):Promise<any
         const menu = await SpecialMenu.findByIdAndDelete(req.params.id);
 
         if (!menu) {
-            return res.status(404).json({ message: "Special menu not found" });
+            return res.status(404).json({success:false, message: "Special menu not found" });
         }
 
-        res.status(200).json({ message: "Special menu deleted successfully" });
+        res.status(200).json({success:true, message: "Special menu deleted successfully" });
     } catch (error: any) {
         res.status(400).json({ message: error.message });
     }

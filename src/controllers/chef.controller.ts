@@ -4,141 +4,236 @@ import mongoose from "mongoose";
 import bcrypt from 'bcryptjs';
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
-import { sendLoginSuccessEmail } from "../services/email/rentAChef/usersEmailNotifs";
+import { sendLoginSuccessEmail, sendPasswordChangeSuccessEmail, sendUserPasswordResetOTPEmail } from "../services/email/rentAChef/usersEmailNotifs";
 import { sendChefCreationSuccessEmail } from "../services/email/rentAChef/chefsEmailNotification";
 import Category from "../models/Category";
+import { Booking, IBooking } from "../models/Booking";
+import { generateOtp } from "../utils/otpUtils";
+import { isChefAvailable } from "../utils/checkChefAvailability";
 
 
 export const createChef = async (req: Request, res: Response): Promise<any> => {
-    try {
-        const chefPic = req.file as any; // multer file
+  try {
+    const chefPic = req.file as any; // multer file
 
-        const {
-            staffId,
-            name,
-            gender,
-            email,
-            bio,
-            phoneNumber,
-            specialties,
-            servicesOffered,
-            location,
-            state,
-            stateId,
-            defaultPassword,
-            category,
-            categoryName,
-        } = req.body;
+    const {
+      staffId,
+      name,
+      gender,
+      email,
+      bio,
+      phoneNumber,
+      specialties,
+      location,
+      state,
+      stateId,
+      defaultPassword,
+      category,
+      yearsOfExperience,
+      rating,
+      dob
+    } = req.body;
 
-        // console.log({ adminSent: req.body });
+    // console.log({ adminSent: req.body });
 
-        if (!staffId || !name || !email || !location || !state||!servicesOffered || !category) {
-            return res.status(400).json({ message: "staffId, category, location, state, name & email are required" });
-        }
-
-        // Check if chef already exists
-        const exists = await Chef.findOne({ $or: [{ email }, { staffId }] });
-        if (exists) {
-            return res.status(400).json({ message: "Chef already exists" });
-        }
-
-        // Handle password
-        const pass = defaultPassword || "Chef@123";
-        const hashedPassword = await bcrypt.hash(pass, 12);
-
-        // // Parse specialties JSON
-        // let specialtiesArray: string[] = [];
-        // try {
-        //     specialtiesArray = specialties ? JSON.parse(specialties) : [];
-        // } catch (err) {
-        //     return res.status(400).json({ message: "Invalid specialties format. Should be an array of strings." });
-        // }
-
-  //  const categoryName1 = await Category.findById(category).select("name");
-        // Create chef
-        const chef = await Chef.create({
-            staffId,
-            name,
-            gender,
-            email,
-            bio,
-            specialties,
-            servicesOffered,
-            location,
-            state,
-            stateId,
-            profilePic: chefPic?.location || chefPic?.path || "", // depending on S3 or local
-            phoneNumber,
-            password: hashedPassword,
-            isActive: true,
-            isPasswordUpdated: false,
-            category,
-            categoryName
-        });
-
-        try {
-          await sendChefCreationSuccessEmail({
-          email,
-          firstName:name
-        })
-        } catch (error) {
-          console.log(error)
-        }
-        return res.status(201).json({
-            message: "Chef created successfully",
-            defaultPassword: pass,
-            chef
-        });
-
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ message: "Error creating chef", error });
+    if (!staffId || !name || !email || !location || !state || !category) {
+      return res.status(400).json({ message: "staffId, category, location, state, name & email are required" });
     }
+
+    // Check if chef already exists
+    const exists = await Chef.findOne({ $or: [{ email }, { staffId }] });
+    if (exists) {
+      return res.status(400).json({ message: "Chef already exists" });
+    }
+
+    // Handle password
+    const pass = defaultPassword || "Chef@123";
+    const hashedPassword = await bcrypt.hash(pass, 12);
+
+    // // Parse specialties JSON
+    // let specialtiesArray: string[] = [];
+    // try {
+    //     specialtiesArray = specialties ? JSON.parse(specialties) : [];
+    // } catch (err) {
+    //     return res.status(400).json({ message: "Invalid specialties format. Should be an array of strings." });
+    // }
+
+    //  const categoryName1 = await Category.findById(category).select("name");
+    // Create chef
+    const chef = await Chef.create({
+      staffId,
+      name,
+      gender,
+      email,
+      bio,
+      specialties,
+      location,
+      state,
+      stateId,
+      profilePic: chefPic?.location || chefPic?.path || "", // depending on S3 or local
+      phoneNumber,
+      password: hashedPassword,
+      isActive: true,
+      isPasswordUpdated: false,
+      category,
+      yearsOfExperience,
+      rating,
+      dob,
+    });
+
+    try {
+      await sendChefCreationSuccessEmail({
+        email,
+        firstName: name
+      })
+    } catch (error) {
+      console.log(error)
+    }
+    return res.status(201).json({
+      message: "Chef created successfully",
+      defaultPassword: pass,
+      chef
+    });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Error creating chef", error });
+  }
 };
 
 export const loginChef = async (req: Request, res: Response): Promise<any> => {
-    try {
-        const { email, password } = req.body;
+  try {
+    const { email, password } = req.body;
 
-        if (!email || !password) {
-            return res.status(400).json({ message: "Email and password are required" });
-        }
-
-        const chef = await Chef.findOne({ email });
-
-        if (!chef) {
-            return res.status(404).json({ message: "Chef not found" });
-        }
-
-        const isMatch = await bcrypt.compare(password, chef.password as string);
-
-        if (!isMatch) {
-            return res.status(401).json({ message: "Invalid password" });
-        }
-
-        // Generate JWT token
-        const token = jwt.sign(
-            { id: chef._id, email: chef.email, staffId: chef.staffId },
-            process.env.JWT_SECRET || "your_jwt_secret",
-            { expiresIn: "7d" }
-        );
-
-        return res.status(200).json({
-            message: "Login successful",
-            token,
-            chef: {
-                id: chef._id,
-                staffId: chef.staffId,
-                name: chef.name,
-                email: chef.email,
-                profilePic: chef.profilePic,
-                isActive: chef.isActive
-            }
-        });
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ message: "Error logging in chef", error });
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password are required" });
     }
+
+    const chef = await Chef.findOne({ email });
+
+    if (!chef) {
+      return res.status(404).json({ message: "Chef not found" });
+    }
+
+    const isMatch = await bcrypt.compare(password, chef.password as string);
+
+    if (!isMatch) {
+      return res.status(401).json({ message: "Invalid password" });
+    }
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { id: chef._id, email: chef.email, staffId: chef.staffId },
+      process.env.JWT_SECRET || "your_jwt_secret",
+      { expiresIn: "7d" }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Login successful",
+      token,
+      payload: {
+        id: chef._id,
+        staffId: chef.staffId,
+        name: chef.name,
+        email: chef.email,
+        profilePic: chef.profilePic,
+        isActive: chef.isActive
+      }
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Error logging in chef", error });
+  }
+};
+
+/**
+ * REQUEST PASSWORD CHANGE OTP
+ */
+export const requestChefPasswordChangeOtp = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const { email } = req.body;
+
+    const chef = await Chef.findOne({ email });
+    if (!chef) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const otp = generateOtp();
+
+    chef.loginOtp = otp;
+    chef.loginOtpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+    await chef.save();
+
+    // await sendEmail(
+    //   user.email,
+    //   'Password Reset OTP',
+    //   `Your password reset OTP is ${otp}. It expires in 10 minutes.`
+    // );
+
+    // Send OTP via email
+    try {
+      await sendUserPasswordResetOTPEmail({
+        firstName: chef.name,
+        email: chef.email,
+        loginOtp: otp,
+      });
+    } catch (error) {
+      console.error("Error sending OTP email:", error);
+      // Don't block login flow if email fails, just log it
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Password reset OTP sent to email',
+    });
+  } catch (error) {
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
+export const changeChefPasswordWithOtp = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const { email, otp, newPassword } = req.body;
+
+    const chef = await Chef.findOne({ email });
+    if (!chef || !chef.loginOtp || !chef.loginOtpExpires) {
+      return res.status(400).json({ message: 'Invalid request' });
+    }
+
+    if (chef.loginOtp !== otp) {
+      return res.status(400).json({ message: 'Invalid OTP' });
+    }
+
+    if (chef.loginOtpExpires < new Date()) {
+      return res.status(400).json({ message: 'OTP expired' });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    chef.password = hashedPassword;
+
+    // clear otp
+    chef.loginOtp = undefined;
+    chef.loginOtpExpires = undefined;
+
+    await chef.save();
+
+    try {
+      await sendPasswordChangeSuccessEmail({
+        firstName: chef.name,
+        email: chef.name,
+      });
+    } catch (error) {
+      console.log(error)
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Password changed successfully',
+    });
+  } catch (error) {
+    return res.status(500).json({ message: 'Server error' });
+  }
 };
 
 
@@ -175,6 +270,7 @@ export const getAllChefs = async (req: Request, res: Response): Promise<any> => 
     // Query
     const [chefs, total] = await Promise.all([
       Chef.find(filter)
+        .populate("category name")
         .select("-password")
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -215,10 +311,7 @@ export const getChefById = async (req: Request, res: Response): Promise<void> =>
 
     const chef = await Chef.findById(id)
       .select("-password") // ✅ exclude password
-      .populate({
-        path: "servicesOffered",
-        select: "_id name"
-      });
+      .populate('category name')
 
     if (!chef) {
       res.status(404).json({ success: false, message: "Chef not found" });
@@ -267,6 +360,10 @@ export const updateChef = async (req: Request, res: Response): Promise<any> => {
       "stateId",
       "staffId",
       "profilePic",
+      "dob",
+      "yearsOfExperience",
+      "password",
+      "rating"
     ];
 
     const updates: Record<string, any> = {};
@@ -295,7 +392,7 @@ export const updateChef = async (req: Request, res: Response): Promise<any> => {
     const chef = await Chef.findByIdAndUpdate(id, updates, {
       new: true,
       runValidators: true,
-    }).populate("category", "name");
+    }).populate("category", "name").select("-password");
 
     if (!chef) {
       return res.status(404).json({ success: false, message: "Chef not found" });
@@ -321,43 +418,85 @@ export const updateChef = async (req: Request, res: Response): Promise<any> => {
 
 // ✅ Disable Chef (ADMIN only)
 export const disableChef = async (req: Request, res: Response): Promise<any> => {
-    try {
-        const chef = await Chef.findByIdAndUpdate(
-            req.params.id,
-            { isActive: false },
-            { new: true }
-        );
+  try {
+    const chef = await Chef.findByIdAndUpdate(
+      req.params.id,
+      { isActive: false },
+      { new: true }
+    );
 
-        if (!chef) {
-            return res.status(404).json({ message: "Chef not found" });
-        }
-
-        res.status(200).json({
-            message: "Chef has been disabled",
-            chef
-        });
-
-    } catch (error) {
-        res.status(500).json({ message: "Error disabling chef", error });
+    if (!chef) {
+      return res.status(404).json({ message: "Chef not found" });
     }
+
+    res.status(200).json({
+      message: "Chef has been disabled",
+      chef
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: "Error disabling chef", error });
+  }
 };
 
 
 
 // ✅ Delete Chef (ADMIN only)
 export const deleteChef = async (req: Request, res: Response): Promise<any> => {
-    try {
-        const chef = await Chef.findByIdAndDelete(req.params.id);
+  try {
+    const chef = await Chef.findByIdAndDelete(req.params.id);
 
-        if (!chef) {
-            return res.status(404).json({ message: "Chef not found" });
-        }
-
-        res.status(200).json({
-            message: "Chef deleted permanently",
-        });
-
-    } catch (error) {
-        res.status(500).json({ message: "Error deleting chef", error });
+    if (!chef) {
+      return res.status(404).json({ message: "Chef not found" });
     }
+
+    res.status(200).json({
+      message: "Chef deleted permanently",
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: "Error deleting chef", error });
+  }
+};
+
+// Controller function to check chef availability
+export const checkChefAvailability = async (req: Request, res: Response): Promise<any> => {
+  try {
+
+    const { chefId, startDate, endDate } = req.body;
+
+    if (!chefId || !startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        message: "chefId, startDate and endDate are required"
+      });
+    }
+
+    const available = await isChefAvailable(
+      chefId,
+      new Date(startDate),
+      new Date(endDate)
+    );
+
+    if (!available) {
+      return res.status(409).json({
+        success: false,
+        message: "Chef is not available for the selected dates"
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Chef is available"
+    });
+
+  } catch (error) {
+
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+      error
+    });
+
+  }
 };

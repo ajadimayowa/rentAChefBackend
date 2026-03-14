@@ -3,14 +3,26 @@ import { Router } from 'express';
 
 import { verifyToken, verifyUserToken } from '../middleware/auth.middleware';
 import { login, register, verifyEmail, verifyLoginOtp } from '../controllers/chefAuthControllers/auth.controller';
-import { getAllUsers } from '../controllers/user/user.controller';
+import { completeKyc, getAllUsers, getUserById, getUserDashboard, updateBioData, updateHealthInformation, updateLocation, updateNok, updateProfilePic } from '../controllers/user/user.controller';
 import { adminAuth } from '../middleware/adminAuth';
+import uploadAdImages from '../middleware/upload';
+import { checkChefAvailability } from '../controllers/chef.controller';
 
 const router = Router();
 
-router.get('/user/dashboard',verifyUserToken, getAllUsers);
-router.get('/user/users',adminAuth, getAllUsers);
-router.get('/user/:id',adminAuth, getAllUsers);
+router.get('/user/dashboard/:id',verifyUserToken, getUserDashboard);
+router.get('/user/users',verifyUserToken, getAllUsers);
+
+router.get('/user/:id',verifyUserToken, getUserById);
+
+router.put('/user/uploadProfilePic/:id',verifyUserToken,uploadAdImages.single('profilePic'), updateProfilePic);
+router.put('/user/updateBiodata/:userId',verifyUserToken,updateBioData);
+router.put('/user/updateLocation/:userId',verifyUserToken,updateLocation);
+router.put('/user/updateNok/:userId',verifyUserToken,updateNok);
+router.put('/user/updateHealthInformation/:userId',verifyUserToken,updateHealthInformation);
+router.put('/user/completeKyc/:userId',verifyUserToken,uploadAdImages.single('idPic'),completeKyc);
+router.put('/user/uploadPicture/:id',verifyUserToken,uploadAdImages.single('profilePic'),updateProfilePic);
+router.post('/user/checkChefavailability',verifyUserToken, checkChefAvailability);
 
 // router.post('/auth/request-password-reset-otp', requestPasswordResetOtp);
 // router.post('/auth/reset-password-with-otp', resetUserPasswordWithOtp);

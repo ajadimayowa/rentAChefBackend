@@ -18,7 +18,7 @@ const generateToken_1 = require("../../utils/generateToken");
 const Chef_1 = __importDefault(require("../../models/Chef"));
 const User_model_1 = __importDefault(require("../../models/User.model"));
 const Category_1 = __importDefault(require("../../models/Category"));
-const Service_model_1 = require("../../models/Service.model");
+const Service_1 = require("../../models/Service");
 const Booking_1 = require("../../models/Booking");
 const adminLogin = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
@@ -38,7 +38,7 @@ const adminLogin = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         const categories = yield Category_1.default.find()
             .select('_id name') // only fetch what you need
             .lean();
-        const services = yield Service_model_1.Service.find()
+        const services = yield Service_1.Service.find()
             .select('_id name') // only fetch what you need
             .lean();
         const formattedCategories = categories.map(cat => ({
@@ -158,7 +158,7 @@ const getAdminDashboard = (req, res) => __awaiter(void 0, void 0, void 0, functi
         const customers = yield User_model_1.default.find();
         const grouped = {};
         bookings.forEach((booking) => {
-            const day = booking.createdAt.toLocaleDateString('en-US', {
+            const day = booking === null || booking === void 0 ? void 0 : booking.createdAt.toLocaleDateString('en-US', {
                 weekday: 'short',
             });
             grouped[day] = (grouped[day] || 0) + 1;

@@ -14,10 +14,14 @@ const admin_routes_1 = __importDefault(require("./routes/admin.routes"));
 const chef_route_1 = __importDefault(require("./routes/chef.route"));
 const category_routes_1 = __importDefault(require("./routes/category.routes"));
 const services_routes_1 = __importDefault(require("./routes/services.routes"));
+const chefService_routes_1 = __importDefault(require("./routes/chefService.routes"));
+const servicepricing_route_1 = __importDefault(require("./routes/servicepricing.route"));
 const user_routes_1 = __importDefault(require("./routes/user.routes"));
 const menu_routes_1 = __importDefault(require("./routes/menu.routes"));
+const payment_routes_1 = __importDefault(require("./routes/payment.routes"));
 const specialmenu_routes_1 = __importDefault(require("./routes/specialmenu.routes"));
 const booking_routes_1 = __importDefault(require("./routes/booking.routes"));
+const quote_routes_1 = __importDefault(require("./routes/quote.routes"));
 dotenv_1.default.config();
 // Connect to DB
 (0, db_1.default)().catch((err) => {
@@ -41,8 +45,12 @@ app.use(apiPrefix, admin_routes_1.default);
 app.use(apiPrefix, chef_route_1.default);
 app.use(apiPrefix, category_routes_1.default);
 app.use(apiPrefix, services_routes_1.default);
+app.use(apiPrefix, chefService_routes_1.default);
+app.use(apiPrefix, servicepricing_route_1.default);
 app.use(apiPrefix, user_routes_1.default);
 app.use(apiPrefix, menu_routes_1.default);
+app.use(apiPrefix, quote_routes_1.default);
+app.use(apiPrefix, payment_routes_1.default);
 app.use(apiPrefix, specialmenu_routes_1.default);
 app.use(apiPrefix, booking_routes_1.default);
 app.use(apiPrefix, stateRoutes_1.default);
