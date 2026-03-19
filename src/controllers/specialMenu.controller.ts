@@ -8,6 +8,8 @@ export const createSpecialMenu = async (req: Request, res: Response):Promise<any
         const {
             title,
             description,
+            minimumGuests,
+            numberOfDishes,
             price,
         } = req.body;
 
@@ -21,6 +23,8 @@ export const createSpecialMenu = async (req: Request, res: Response):Promise<any
         const specialMenu = await SpecialMenu.create({
             title,
             description,
+            minimumGuests,
+            numberOfDishes,
             image: menuPic?.location || menuPic?.path || "", // depending on S3 or local
             price,
         });

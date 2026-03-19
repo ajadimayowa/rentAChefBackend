@@ -97,7 +97,7 @@ exports.getBookingById = getBookingById;
 // Update a booking by ID
 const updateBooking = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { clientId, chefId, serviceId, categoryId, subCategoryId, specialMenuId, dates, bookingFeePaid, procurementPaid, bookingFeeAmount, procurementAmount, totalAmount, status, cancellationReason, } = req.body;
+        const { clientId, chefId, serviceId, categoryId, subCategoryId, specialMenuId, dates, bookingFeePaid, bookingFeeAmount, totalAmount, procurementId, status, cancellationReason, } = req.body;
         const updatedBooking = yield Booking_1.Booking.findByIdAndUpdate(req.params.id, {
             clientId,
             chefId,
@@ -107,10 +107,9 @@ const updateBooking = (req, res) => __awaiter(void 0, void 0, void 0, function* 
             specialMenuId,
             dates,
             bookingFeePaid,
-            procurementPaid,
             bookingFeeAmount,
-            procurementAmount,
             totalAmount,
+            procurementId,
             status,
             cancellationReason,
         }, { new: true }).populate("clientId chefId serviceId categoryId subCategoryId specialMenuId");

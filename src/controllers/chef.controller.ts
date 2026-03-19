@@ -7,6 +7,7 @@ import dotenv from "dotenv";
 import { sendLoginSuccessEmail, sendPasswordChangeSuccessEmail, sendUserPasswordResetOTPEmail } from "../services/email/rentAChef/usersEmailNotifs";
 import { sendChefCreationSuccessEmail } from "../services/email/rentAChef/chefsEmailNotification";
 import Category from "../models/Category";
+import { ChefService } from "../models/ChefService";
 import { Booking, IBooking } from "../models/Booking";
 import { generateOtp } from "../utils/otpUtils";
 import { isChefAvailable } from "../utils/checkChefAvailability";
@@ -69,15 +70,10 @@ export const createChef = async (req: Request, res: Response): Promise<any> => {
       specialties,
       location,
       state,
+      category,
       stateId,
       profilePic: chefPic?.location || chefPic?.path || "", // depending on S3 or local
       phoneNumber,
-      password: hashedPassword,
-      isActive: true,
-      isPasswordUpdated: false,
-      category,
-      yearsOfExperience,
-      rating,
       dob,
     });
 
@@ -89,11 +85,40 @@ export const createChef = async (req: Request, res: Response): Promise<any> => {
     } catch (error) {
       console.log(error)
     }
-    return res.status(201).json({
-      message: "Chef created successfully",
-      defaultPassword: pass,
-      chef
-    });
+
+    // After creating chef, optionally create ChefService entries if serviceId(s) provided
+    try {
+      const { serviceId, serviceIds, isAvailable } = req.body as any;
+      const ids: string[] = Array.isArray(serviceIds) ? serviceIds : (serviceId ? [serviceId] : []);
+
+      let createdServices: any[] = [];
+      let dupCount = 0;
+
+      if (ids.length > 0) {
+        const results = await Promise.allSettled(
+          ids.map((sid: string) => ChefService.create({ chefId: chef._id, serviceId: sid, isAvailable: isAvailable ?? true }))
+        );
+
+        createdServices = results.filter((r: any) => r.status === 'fulfilled').map((r: any) => r.value);
+        dupCount = results.filter((r: any) => r.status === 'rejected' && r.reason && r.reason.code === 11000).length;
+      }
+
+      return res.status(201).json({
+        message: "Chef created successfully",
+        defaultPassword: pass,
+        chef,
+        chefServicesCreated: createdServices,
+        chefServicesDuplicatesSkipped: dupCount
+      });
+
+    } catch (err) {
+      console.warn('Failed to create chef services:', err);
+      return res.status(201).json({
+        message: "Chef created successfully (services creation failed)",
+        defaultPassword: pass,
+        chef
+      });
+    }
 
   } catch (error) {
     console.error(error);
@@ -311,16 +336,40 @@ export const getChefById = async (req: Request, res: Response): Promise<void> =>
 
     const chef = await Chef.findById(id)
       .select("-password") // ✅ exclude password
-      .populate('category name')
+      .populate('category', 'name')
 
     if (!chef) {
       res.status(404).json({ success: false, message: "Chef not found" });
       return;
     }
 
+    // compute booking counts
+    const now = new Date();
+    const [totalChefBooking, totalCompletedBooking, totalUpcoming] = await Promise.all([
+      Booking.countDocuments({ chefId: id }),
+      Booking.countDocuments({ chefId: id, status: 'completed' }),
+      Booking.countDocuments({ chefId: id, status: { $in: ['confirmed', 'ongoing'] }, startDate: { $gte: now } }),
+    ]);
+
+    // fetch recent menus for this chef (last 3)
+    const { Menu } = await import('../models/Menu');
+    const getTheChefMenu = await Menu.find({ chefId: id }).sort({ createdAt: -1 }).limit(3).lean();
+
+    // fetch services offered via ChefService
+    const { ChefService } = await import('../models/ChefService');
+    const services = await ChefService.find({ chefId: id, isAvailable: true }).populate('serviceId', 'name').lean();
+    const servicesOffered = services.map((s: any) => ({ id: s.serviceId?._id || s.serviceId, name: s.serviceId?.name || s.serviceId }));
+
     res.status(200).json({
       success: true,
-      payload: chef,
+      payload: {
+        chef,
+        totalChefBooking,
+        totalCompletedBooking,
+        totalUpcoming,
+        getTheChefMenu,
+        servicesOffered,
+      },
     });
   } catch (error) {
     res.status(500).json({

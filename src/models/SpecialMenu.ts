@@ -11,8 +11,10 @@ interface IProcurement {
 export interface ISpecialMenu extends Document {
   title: string; // Anniversary, Date Night
   description?: string;
+  minimumGuests:number;
+  numberOfDishes:number;
   image?: string;
-  procurements: IProcurement[];
+  procurements?: IProcurement[];
   price: number;
   createdAt: Date;
   updatedAt: Date;
@@ -33,6 +35,8 @@ const SpecialMenuSchema = new Schema<ISpecialMenu>(
   {
     title: { type: String, required: true, trim: true },
     description: { type: String },
+    minimumGuests: { type: Number, required: true },
+    numberOfDishes: { type: Number, required: true },
     image: { type: String }, // image URL
     procurements: {
       type: [ProcurementSchema],

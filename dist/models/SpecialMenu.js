@@ -12,6 +12,8 @@ const ProcurementSchema = new mongoose_1.Schema({
 const SpecialMenuSchema = new mongoose_1.Schema({
     title: { type: String, required: true, trim: true },
     description: { type: String },
+    minimumGuests: { type: Number, required: true },
+    numberOfDishes: { type: Number, required: true },
     image: { type: String }, // image URL
     procurements: {
         type: [ProcurementSchema],
