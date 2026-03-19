@@ -10,18 +10,32 @@ import { ChefService } from "../../models/ChefService";
  */
 export const createChefService = async (req: Request, res: Response): Promise<any> => {
     try {
-        const { chefId, serviceId, isAvailable } = req.body;
+        // Accept either a single serviceId or an array of serviceIds
+        const { chefId, serviceId, serviceIds, isAvailable } = req.body;
 
-        const chefService = await ChefService.create({
-            chefId,
-            serviceId,
-            isAvailable
-        });
+        const ids: string[] = Array.isArray(serviceIds)
+            ? serviceIds
+            : (serviceId ? [serviceId] : []);
+
+        if (!chefId || ids.length === 0) {
+            return res.status(400).json({ success: false, message: 'chefId and at least one serviceId are required' });
+        }
+
+        // Create each chef-service entry, but tolerate duplicates (unique index on chefId+serviceId)
+        const results = await Promise.allSettled(
+            ids.map((sid: string) => ChefService.create({ chefId, serviceId: sid, isAvailable }))
+        );
+
+        const created = results
+            .filter((r: any) => r.status === 'fulfilled')
+            .map((r: any) => r.value);
+
+        const dupCount = results.filter((r: any) => r.status === 'rejected' && r.reason && r.reason.code === 11000).length;
 
         return res.status(201).json({
             success: true,
-            message: "Chef service created successfully",
-            payload: chefService
+            message: `Chef services created${dupCount ? ` (${dupCount} skipped due to duplicates)` : ''}`,
+            payload: created
         });
 
     } catch (error: any) {

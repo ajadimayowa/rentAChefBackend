@@ -38,7 +38,7 @@ export const sendMail = async ({
   html,
   remoteImages = [],
   localImages = [],
-  retries = 3,
+  retries = 1,
   retryDelayMs = 2000,
 }: SendMailOptions) => {
   const { SMTP_HOST, SMTP_USERNAME, SMTP_PASSWORD, SMTP_PORT } = process.env;

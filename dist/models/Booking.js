@@ -64,10 +64,6 @@ const BookingSchema = new mongoose_1.Schema({
         type: Boolean,
         default: true,
     },
-    procurementPaid: {
-        type: Boolean,
-        default: false,
-    },
     bookingFeeAmount: {
         type: Number,
         min: 0,
@@ -80,11 +76,9 @@ const BookingSchema = new mongoose_1.Schema({
         default: 1,
         required: true,
     },
-    procurementAmount: {
-        type: Number,
-        min: 0,
-        default: 0,
-        required: true,
+    procurementId: {
+        type: mongoose_1.Schema.Types.ObjectId,
+        ref: 'Procurement',
     },
     totalAmount: {
         type: Number,

@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -20,6 +53,8 @@ const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const usersEmailNotifs_1 = require("../services/email/rentAChef/usersEmailNotifs");
 const chefsEmailNotification_1 = require("../services/email/rentAChef/chefsEmailNotification");
 const Category_1 = __importDefault(require("../models/Category"));
+const ChefService_1 = require("../models/ChefService");
+const Booking_1 = require("../models/Booking");
 const otpUtils_1 = require("../utils/otpUtils");
 const checkChefAvailability_1 = require("../utils/checkChefAvailability");
 const createChef = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -56,15 +91,10 @@ const createChef = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             specialties,
             location,
             state,
+            category,
             stateId,
             profilePic: (chefPic === null || chefPic === void 0 ? void 0 : chefPic.location) || (chefPic === null || chefPic === void 0 ? void 0 : chefPic.path) || "", // depending on S3 or local
             phoneNumber,
-            password: hashedPassword,
-            isActive: true,
-            isPasswordUpdated: false,
-            category,
-            yearsOfExperience,
-            rating,
             dob,
         });
         try {
@@ -76,11 +106,33 @@ const createChef = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         catch (error) {
             console.log(error);
         }
-        return res.status(201).json({
-            message: "Chef created successfully",
-            defaultPassword: pass,
-            chef
-        });
+        // After creating chef, optionally create ChefService entries if serviceId(s) provided
+        try {
+            const { serviceId, serviceIds, isAvailable } = req.body;
+            const ids = Array.isArray(serviceIds) ? serviceIds : (serviceId ? [serviceId] : []);
+            let createdServices = [];
+            let dupCount = 0;
+            if (ids.length > 0) {
+                const results = yield Promise.allSettled(ids.map((sid) => ChefService_1.ChefService.create({ chefId: chef._id, serviceId: sid, isAvailable: isAvailable !== null && isAvailable !== void 0 ? isAvailable : true })));
+                createdServices = results.filter((r) => r.status === 'fulfilled').map((r) => r.value);
+                dupCount = results.filter((r) => r.status === 'rejected' && r.reason && r.reason.code === 11000).length;
+            }
+            return res.status(201).json({
+                message: "Chef created successfully",
+                defaultPassword: pass,
+                chef,
+                chefServicesCreated: createdServices,
+                chefServicesDuplicatesSkipped: dupCount
+            });
+        }
+        catch (err) {
+            console.warn('Failed to create chef services:', err);
+            return res.status(201).json({
+                message: "Chef created successfully (services creation failed)",
+                defaultPassword: pass,
+                chef
+            });
+        }
     }
     catch (error) {
         console.error(error);
@@ -265,14 +317,35 @@ const getChefById = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         }
         const chef = yield Chef_1.default.findById(id)
             .select("-password") // ✅ exclude password
-            .populate('category name');
+            .populate('category', 'name');
         if (!chef) {
             res.status(404).json({ success: false, message: "Chef not found" });
             return;
         }
+        // compute booking counts
+        const now = new Date();
+        const [totalChefBooking, totalCompletedBooking, totalUpcoming] = yield Promise.all([
+            Booking_1.Booking.countDocuments({ chefId: id }),
+            Booking_1.Booking.countDocuments({ chefId: id, status: 'completed' }),
+            Booking_1.Booking.countDocuments({ chefId: id, status: { $in: ['confirmed', 'ongoing'] }, startDate: { $gte: now } }),
+        ]);
+        // fetch recent menus for this chef (last 3)
+        const { Menu } = yield Promise.resolve().then(() => __importStar(require('../models/Menu')));
+        const getTheChefMenu = yield Menu.find({ chefId: id }).sort({ createdAt: -1 }).limit(3).lean();
+        // fetch services offered via ChefService
+        const { ChefService } = yield Promise.resolve().then(() => __importStar(require('../models/ChefService')));
+        const services = yield ChefService.find({ chefId: id, isAvailable: true }).populate('serviceId', 'name').lean();
+        const servicesOffered = services.map((s) => { var _a, _b; return ({ id: ((_a = s.serviceId) === null || _a === void 0 ? void 0 : _a._id) || s.serviceId, name: ((_b = s.serviceId) === null || _b === void 0 ? void 0 : _b.name) || s.serviceId }); });
         res.status(200).json({
             success: true,
-            payload: chef,
+            payload: {
+                chef,
+                totalChefBooking,
+                totalCompletedBooking,
+                totalUpcoming,
+                getTheChefMenu,
+                servicesOffered,
+            },
         });
     }
     catch (error) {

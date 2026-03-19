@@ -18,6 +18,8 @@ import paymentRoutes from './routes/payment.routes';
 import specialMenuRoutes from './routes/specialmenu.routes';
 import bookingRoutes from './routes/booking.routes'
 import quoteRoutes from './routes/quote.routes'
+import notificationRoutes from './routes/notification.routes';
+import procurementRoutes from './routes/procurement.routes';
 
 
 dotenv.config();
@@ -58,6 +60,8 @@ app.use(apiPrefix, paymentRoutes);
 app.use(apiPrefix, specialMenuRoutes);
 app.use(apiPrefix, bookingRoutes);
 app.use(apiPrefix, stateRoutes);
+app.use(apiPrefix, notificationRoutes);
+app.use(apiPrefix, procurementRoutes);
 
 
 

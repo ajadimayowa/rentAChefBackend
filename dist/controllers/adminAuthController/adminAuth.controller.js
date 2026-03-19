@@ -152,21 +152,37 @@ const getAdminById = (req, res) => __awaiter(void 0, void 0, void 0, function* (
 });
 exports.getAdminById = getAdminById;
 const getAdminDashboard = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
-        const bookings = yield Booking_1.Booking.find();
-        const chefs = yield Chef_1.default.find();
-        const customers = yield User_model_1.default.find();
-        const grouped = {};
-        bookings.forEach((booking) => {
-            const day = booking === null || booking === void 0 ? void 0 : booking.createdAt.toLocaleDateString('en-US', {
-                weekday: 'short',
-            });
-            grouped[day] = (grouped[day] || 0) + 1;
-        });
-        const chartData = Object.entries(grouped).map(([day, count]) => ({
-            name: day, // 👈 xKey
-            users: count, // 👈 dataKey
-        }));
+        // compute counts
+        const [chefsCount, customersCount] = yield Promise.all([
+            Chef_1.default.countDocuments(),
+            User_model_1.default.countDocuments(),
+        ]);
+        // compute total revenue from confirmed bookings (sum of totalAmount)
+        const revenueAgg = yield Booking_1.Booking.aggregate([
+            { $match: { status: 'confirmed' } },
+            { $group: { _id: null, totalRevenue: { $sum: { $ifNull: ["$totalAmount", 0] } } } }
+        ]);
+        const totalRevenue = ((_a = revenueAgg === null || revenueAgg === void 0 ? void 0 : revenueAgg[0]) === null || _a === void 0 ? void 0 : _a.totalRevenue) || 0;
+        // booking trends for last 6 months (including current month)
+        const now = new Date();
+        const start = new Date(now.getFullYear(), now.getMonth() - 5, 1, 0, 0, 0, 0);
+        const trendsAgg = yield Booking_1.Booking.aggregate([
+            { $match: { status: 'confirmed', createdAt: { $gte: start } } },
+            { $group: { _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } }, count: { $sum: 1 } } },
+            { $sort: { '_id.year': 1, '_id.month': 1 } }
+        ]);
+        // build last 6 months labels and map counts
+        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const chartData = [];
+        for (let i = 5; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            const year = d.getFullYear();
+            const month = d.getMonth() + 1; // aggregate months are 1-based
+            const entry = trendsAgg.find((t) => t._id.year === year && t._id.month === month);
+            chartData.push({ name: monthNames[month - 1], users: entry ? entry.count : 0 });
+        }
         // const admin = await Admin.findById(req.params.id).select("-password");
         // if (!admin) {
         //   return res.status(404).json({
@@ -178,11 +194,11 @@ const getAdminDashboard = (req, res) => __awaiter(void 0, void 0, void 0, functi
             success: true,
             payload: {
                 cardData: {
-                    revenue: 500000,
-                    customers: customers.length,
-                    chefs: chefs.length
+                    revenue: totalRevenue,
+                    customers: customersCount,
+                    chefs: chefsCount,
                 },
-                bookings: chartData
+                bookings: chartData,
             },
         });
     }

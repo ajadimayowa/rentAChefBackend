@@ -1,9 +1,11 @@
 import { Request, Response } from "express";
 import { Booking } from "../models/Booking"; // Path to your Booking model
-
-// Create a new booking
+import User from '../models/User.model';
+import Chef from '../models/Chef';
 import axios from "axios";
 import { isChefAvailable } from "../utils/checkChefAvailability";
+import Procurement from '../models/Procurement';
+import { Types } from 'mongoose';
 
 export const createBooking = async (req: Request, res: Response): Promise<any> => {
   try {
@@ -19,94 +21,45 @@ export const createBooking = async (req: Request, res: Response): Promise<any> =
       startDate,
       endDate,
       bookingFeeAmount,
-      procurementAmount,
       totalAmount,
       paymentChannel,
       paymentReference
     } = req.body;
 
-    // console.log({
-    //   updating:req.body
-    // })
     if (!clientId || !startDate || !endDate || !paymentReference) {
-      return res.status(400).json({
-        success: false,
-        message: "Missing required fields"
-      });
+      return res.status(400).json({ success: false, message: "Missing required fields" });
     }
-
-
 
     if (!serviceId && !specialMenuId) {
-  return res.status(400).json({
-    success: false,
-    message: "Either Service ID or Special Menu ID is required"
-  });
-}
-
- /* Determine booking type */
-    let bookingType: "chef" | "special-menu";
-    if (specialMenuId) {
-      bookingType = "special-menu";
-    } else if (chefId && serviceId) {
-      bookingType = "chef";
-    } else {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid booking payload"
-      });
+      return res.status(400).json({ success: false, message: "Either Service ID or Special Menu ID is required" });
     }
 
+    /* Determine booking type */
+    let bookingType: "chef" | "special-menu";
+    if (specialMenuId) bookingType = "special-menu";
+    else if (chefId && serviceId) bookingType = "chef";
+    else return res.status(400).json({ success: false, message: "Invalid booking payload" });
 
-if (bookingType === "chef") {
+    if (bookingType === "chef") {
+      const available = await isChefAvailable(chefId, new Date(startDate), new Date(endDate));
+      if (!available) return res.status(409).json({ success: false, message: "Chef already booked for this time range" });
+    }
 
-  const available = await isChefAvailable(
-    chefId,
-    new Date(startDate),
-    new Date(endDate)
-  );
-
-  if (!available) {
-    return res.status(409).json({
-      success: false,
-      message: "Chef already booked for this time range"
-    });
-  }
-
-}
     /* Prevent duplicate booking from same payment */
     const existingPayment = await Booking.findOne({ paymentReference });
-    if (existingPayment) {
-      return res.status(409).json({
-        success: false,
-        message: "Booking already created for this payment"
-      });
-    }
+    if (existingPayment) return res.status(409).json({ success: false, message: "Booking already created for this payment" });
 
     /* If payment channel is paystack, verify payment */
     if (paymentChannel === "paystack") {
       const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
-      if (!PAYSTACK_SECRET_KEY) {
-        throw new Error("Paystack secret key not configured");
-      }
+      if (!PAYSTACK_SECRET_KEY) throw new Error("Paystack secret key not configured");
 
       const verifyUrl = `https://api.paystack.co/transaction/verify/${paymentReference}`;
-
-      const response = await axios.get(verifyUrl, {
-        headers: {
-          Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`
-        }
-      });
-
+      const response = await axios.get(verifyUrl, { headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` } });
       if (!response.data || !response.data.data || response.data.data.status !== "success") {
-        return res.status(400).json({
-          success: false,
-          message: "Payment verification failed"
-        });
+        return res.status(400).json({ success: false, message: "Payment verification failed" });
       }
     }
-
-   
 
     /* Chef availability protection */
     if (bookingType === "chef") {
@@ -116,13 +69,7 @@ if (bookingType === "chef") {
         startDate: { $lt: new Date(endDate) },
         endDate: { $gt: new Date(startDate) }
       });
-
-      if (conflict) {
-        return res.status(409).json({
-          success: false,
-          message: "Chef already booked for this time range"
-        });
-      }
+      if (conflict) return res.status(409).json({ success: false, message: "Chef already booked for this time range" });
     }
 
     /* Create booking */
@@ -139,34 +86,32 @@ if (bookingType === "chef") {
       startDate,
       endDate,
       bookingFeePaid: true,
-      procurementPaid: false,
       bookingFeeAmount,
-      procurementAmount: procurementAmount || 0,
+      // procurement is now handled by Procurement model (linked via booking.procurementId)
       totalAmount: totalAmount || bookingFeeAmount,
       paymentChannel,
       paymentReference,
       status: "confirmed"
     });
 
-    return res.status(201).json({
-      success: true,
-      message: "Booking created successfully",
-      data: booking
-    });
+    // If procurement items were provided, create Procurement and attach
+    if (req.body.procurementItems && Array.isArray(req.body.procurementItems) && req.body.procurementItems.length > 0) {
+      const procurement = await Procurement.create({ bookingId: booking._id, items: req.body.procurementItems });
+      booking.procurementId = procurement._id as Types.ObjectId;
+      // if totalAmount was not provided, add procurement total
+      if (!totalAmount) {
+        booking.totalAmount = (booking.totalAmount || 0) + (procurement.totalCost || 0);
+      }
+      await booking.save();
+    }
 
+    return res.status(201).json({ success: true, message: "Booking created successfully", data: booking });
   } catch (error: any) {
     if (error.code === 11000) {
-      return res.status(409).json({
-        success: false,
-        message: "Chef already booked for this time slot"
-      });
+      return res.status(409).json({ success: false, message: "Chef already booked for this time slot" });
     }
-console.log({seeError:error})
-    return res.status(500).json({
-      success: false,
-      message: "Failed to create booking",
-      error: error.message
-    });
+    console.log({ seeError: error });
+    return res.status(500).json({ success: false, message: "Failed to create booking", error: error.message });
   }
 };
 
@@ -188,10 +133,35 @@ export const getBookings = async (req: Request, res: Response): Promise<any> => 
       paymentReference
     } = req.query;
 
+    const { searchByUserName, searchByChefName } = req.query;
+
     const query: any = {};
 
     if (clientId) query.clientId = clientId;
     if (chefId) query.chefId = chefId;
+    // support searching by user name (partial match)
+    if (searchByUserName) {
+      const regex = new RegExp(String(searchByUserName), 'i');
+      const users = await User.find({
+        $or: [
+          { fullName: { $regex: regex } },
+          { firstName: { $regex: regex } },
+          { email: { $regex: regex } }
+        ]
+      }).select('_id');
+      const ids = users.map(u => u._id);
+      if (ids.length > 0) query.clientId = { $in: ids };
+      else query.clientId = { $in: [] }; // no matches -> empty result
+    }
+
+    // support searching by chef name (partial match)
+    if (searchByChefName) {
+      const regex = new RegExp(String(searchByChefName), 'i');
+      const chefs = await Chef.find({ name: { $regex: regex } }).select('_id');
+      const chefIds = chefs.map(c => c._id);
+      if (chefIds.length > 0) query.chefId = { $in: chefIds };
+      else query.chefId = { $in: [] };
+    }
     if (status) query.status = status;
     if (paymentReference) query.paymentReference = paymentReference;
 
@@ -250,7 +220,8 @@ export const getBooking = async (req: Request, res: Response): Promise<any> => {
       .populate("clientId")
       .populate("chefId")
       .populate("serviceId")
-      .populate("specialMenuId");
+      .populate("specialMenuId")
+      .populate("procurementId")
 
     if (!booking) {
       return res.status(404).json({

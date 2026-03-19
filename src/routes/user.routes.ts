@@ -7,11 +7,12 @@ import { completeKyc, getAllUsers, getUserById, getUserDashboard, updateBioData,
 import { adminAuth } from '../middleware/adminAuth';
 import uploadAdImages from '../middleware/upload';
 import { checkChefAvailability } from '../controllers/chef.controller';
+import { isAdmin } from '../middleware/isAdmin';
 
 const router = Router();
 
 router.get('/user/dashboard/:id',verifyUserToken, getUserDashboard);
-router.get('/user/users',verifyUserToken, getAllUsers);
+router.get('/user/users',isAdmin, getAllUsers);
 
 router.get('/user/:id',verifyUserToken, getUserById);
 

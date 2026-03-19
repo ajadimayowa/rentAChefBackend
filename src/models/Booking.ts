@@ -14,12 +14,10 @@ export interface IBooking extends Document {
   endDate: Date;
 
   bookingFeePaid: boolean;
-  procurementPaid: boolean;
-
   bookingFeeAmount: number;
   numberOfPeople: number;
-  procurementAmount: number;
   totalAmount: number;
+  procurementId?: Types.ObjectId;
 
   bookingType: "special-menu" | "chef";
 
@@ -108,11 +106,6 @@ const BookingSchema = new Schema<IBooking>(
       default: true,
     },
 
-    procurementPaid: {
-      type: Boolean,
-      default: false,
-    },
-
     bookingFeeAmount: {
       type: Number,
       min: 0,
@@ -127,11 +120,9 @@ const BookingSchema = new Schema<IBooking>(
       required: true,
     },
 
-    procurementAmount: {
-      type: Number,
-      min: 0,
-      default: 0,
-      required: true,
+    procurementId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Procurement',
     },
 
     totalAmount: {

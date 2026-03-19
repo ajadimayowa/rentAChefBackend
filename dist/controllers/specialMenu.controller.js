@@ -15,7 +15,7 @@ const SpecialMenu_1 = require("../models/SpecialMenu");
 const createSpecialMenu = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const menuPic = req.file; // multer file
-        const { title, description, price, } = req.body;
+        const { title, description, minimumGuests, numberOfDishes, price, } = req.body;
         /** Basic validation */
         if (!title || !price) {
             return res.status(400).json({
@@ -25,6 +25,8 @@ const createSpecialMenu = (req, res) => __awaiter(void 0, void 0, void 0, functi
         const specialMenu = yield SpecialMenu_1.SpecialMenu.create({
             title,
             description,
+            minimumGuests,
+            numberOfDishes,
             image: (menuPic === null || menuPic === void 0 ? void 0 : menuPic.location) || (menuPic === null || menuPic === void 0 ? void 0 : menuPic.path) || "", // depending on S3 or local
             price,
         });

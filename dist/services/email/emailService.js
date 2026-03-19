@@ -16,7 +16,7 @@ exports.sendMail = void 0;
 const nodemailer_1 = __importDefault(require("nodemailer"));
 const path_1 = __importDefault(require("path"));
 const axios_1 = __importDefault(require("axios"));
-const sendMail = (_a) => __awaiter(void 0, [_a], void 0, function* ({ userEmail, subject, html, remoteImages = [], localImages = [], retries = 3, retryDelayMs = 2000, }) {
+const sendMail = (_a) => __awaiter(void 0, [_a], void 0, function* ({ userEmail, subject, html, remoteImages = [], localImages = [], retries = 1, retryDelayMs = 2000, }) {
     const { SMTP_HOST, SMTP_USERNAME, SMTP_PASSWORD, SMTP_PORT } = process.env;
     if (!SMTP_HOST || !SMTP_USERNAME || !SMTP_PASSWORD) {
         throw new Error('SMTP credentials are not set in .env');
