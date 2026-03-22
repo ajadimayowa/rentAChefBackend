@@ -12,10 +12,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteProcurement = exports.markProcurementPaid = exports.updateProcurement = exports.getProcurement = exports.getProcurements = exports.createProcurement = void 0;
+exports.deleteProcurement = exports.markProcurementPaid = exports.updateProcurement = exports.getProcurement = exports.getProcurements = exports.userPayProcurement = exports.createProcurement = void 0;
 const Procurement_1 = __importDefault(require("../models/Procurement"));
 const axios_1 = __importDefault(require("axios"));
 const Booking_1 = require("../models/Booking");
+const Notification_1 = __importDefault(require("../models/Notification"));
 const createProcurement = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { bookingId, items, isProcurementPaid, paymentChannel, paymentReference } = req.body;
@@ -37,6 +38,18 @@ const createProcurement = (req, res) => __awaiter(void 0, void 0, void 0, functi
         // attach procurement to booking
         booking.procurementId = procurement._id;
         yield booking.save();
+        // Notify customer that procurement has been added to their booking
+        try {
+            yield Notification_1.default.create({
+                userId: booking.clientId,
+                type: 'procurement-update',
+                title: 'Procurement added to booking',
+                message: `Additional procurement items were added to your booking. Total: ${procurement.totalCost}`,
+            });
+        }
+        catch (err) {
+            console.error('Failed to create notification for procurement creation', err);
+        }
         return res.status(201).json({ success: true, payload: procurement });
     }
     catch (error) {
@@ -45,6 +58,83 @@ const createProcurement = (req, res) => __awaiter(void 0, void 0, void 0, functi
     }
 });
 exports.createProcurement = createProcurement;
+/**
+ * Allow booking customer to pay procurement via paystack and mark as paid
+ */
+const userPayProcurement = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const user = req.user;
+        if (!user)
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        const { paymentChannel, paymentReference } = req.body;
+        if (!paymentChannel || !paymentReference)
+            return res.status(400).json({ success: false, message: 'paymentChannel and paymentReference required' });
+        const procurement = yield Procurement_1.default.findById(req.params.id);
+        if (!procurement)
+            return res.status(404).json({ success: false, message: 'Procurement not found' });
+        // ensure procurement belongs to a booking owned by user
+        const booking = yield Booking_1.Booking.findById(procurement.bookingId);
+        if (!booking)
+            return res.status(404).json({ success: false, message: 'Associated booking not found' });
+        if (String(booking.clientId) !== String(user._id))
+            return res.status(403).json({ success: false, message: 'Not allowed to pay this procurement' });
+        // reuse existing mark logic for paystack or transfer
+        if (paymentChannel === 'transfer') {
+            // user cannot mark transfer as paid
+            return res.status(403).json({ success: false, message: 'Transfer marking must be performed by admin' });
+        }
+        if (paymentChannel === 'paystack') {
+            const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
+            if (!PAYSTACK_SECRET_KEY)
+                return res.status(500).json({ success: false, message: 'Paystack not configured' });
+            try {
+                const verifyUrl = `https://api.paystack.co/transaction/verify/${paymentReference}`;
+                const response = yield axios_1.default.get(verifyUrl, { headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` } });
+                const data = response.data && response.data.data;
+                if (!data || data.status !== 'success')
+                    return res.status(400).json({ success: false, message: 'Paystack verification failed' });
+                const paidAmount = Number(data.amount) / 100;
+                if (typeof procurement.totalCost === 'number' && paidAmount < procurement.totalCost) {
+                    procurement.paymentChannel = paymentChannel;
+                    procurement.paymentReference = paymentReference;
+                    procurement.isProcurementPaid = true;
+                    yield procurement.save();
+                    return res.status(400).json({ success: false, message: 'Payment amount less than procurement total' });
+                }
+                procurement.isProcurementPaid = true;
+                procurement.paymentChannel = paymentChannel;
+                procurement.paymentReference = paymentReference;
+                yield procurement.save();
+                // notify chef that procurement has been paid
+                try {
+                    if (booking.chefId) {
+                        yield Notification_1.default.create({
+                            userId: booking.chefId,
+                            type: 'payment-receipt',
+                            title: 'Procurement paid',
+                            message: `Procurement for booking ${booking._id} has been paid by the customer.`,
+                        });
+                    }
+                }
+                catch (err) {
+                    console.error('Failed to send notification on procurement paid', err);
+                }
+                return res.json({ success: true, message: 'Procurement marked as paid', payload: procurement });
+            }
+            catch (err) {
+                console.error('Paystack verification error', ((_a = err === null || err === void 0 ? void 0 : err.response) === null || _a === void 0 ? void 0 : _a.data) || err.message || err);
+                return res.status(500).json({ success: false, message: 'Error verifying Paystack payment' });
+            }
+        }
+        return res.status(400).json({ success: false, message: 'Unsupported payment channel' });
+    }
+    catch (error) {
+        console.error('userPayProcurement error', error);
+        return res.status(500).json({ success: false, message: 'Failed to process procurement payment', error: error.message });
+    }
+});
+exports.userPayProcurement = userPayProcurement;
 const getProcurements = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { bookingId } = req.query;

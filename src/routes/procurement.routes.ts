@@ -6,6 +6,7 @@ import {
   updateProcurement,
   deleteProcurement,
   markProcurementPaid,
+  userPayProcurement,
 } from '../controllers/procurement.controller';
 import { verifyUserToken } from '../middleware/auth.middleware';
 import { chefOrAdmin } from '../middleware/chefOrAdmin.middleware';
@@ -19,7 +20,9 @@ router.get('/procurements', chefOrAdmin, getProcurements);
 router.get('/procurement/:id', chefOrAdmin, getProcurement);
 // Admins or the chef who owns the booking can update/delete/mark-paid procurements
 router.put('/procurement/:id', adminOrBookingChef, updateProcurement);
-router.put('/procurement/:id/mark-paid', adminOrBookingChef, markProcurementPaid);
-router.delete('/procurement/:id', adminOrBookingChef, deleteProcurement);
+router.put('/procurement/:id/mark-paid',markProcurementPaid);
+// Allow booking customer to pay procurement using paystack
+router.post('/procurement/:id/pay', verifyUserToken, userPayProcurement);
+router.delete('/procurement/:id', deleteProcurement);
 
 export default router;

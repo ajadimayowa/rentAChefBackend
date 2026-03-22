@@ -6,6 +6,7 @@ import axios from "axios";
 import { isChefAvailable } from "../utils/checkChefAvailability";
 import Procurement from '../models/Procurement';
 import { Types } from 'mongoose';
+import Notification from '../models/Notification';
 
 export const createBooking = async (req: Request, res: Response): Promise<any> => {
   try {
@@ -25,6 +26,8 @@ export const createBooking = async (req: Request, res: Response): Promise<any> =
       paymentChannel,
       paymentReference
     } = req.body;
+
+    console.log({ frontSent: req.body });
 
     if (!clientId || !startDate || !endDate || !paymentReference) {
       return res.status(400).json({ success: false, message: "Missing required fields" });
@@ -105,6 +108,20 @@ export const createBooking = async (req: Request, res: Response): Promise<any> =
       await booking.save();
     }
 
+    // Notify chef that a booking was created (if chef assigned)
+    try {
+      if (booking.chefId) {
+        await Notification.create({
+          userId: booking.chefId,
+          type: 'booking-confirmation',
+          title: 'New booking received',
+          message: `You have a new booking (${booking._id}) scheduled from ${booking.startDate} to ${booking.endDate}`,
+        });
+      }
+    } catch (err) {
+      console.error('Failed to create notification for chef on booking creation', err);
+    }
+
     return res.status(201).json({ success: true, message: "Booking created successfully", data: booking });
   } catch (error: any) {
     if (error.code === 11000) {
@@ -114,6 +131,9 @@ export const createBooking = async (req: Request, res: Response): Promise<any> =
     return res.status(500).json({ success: false, message: "Failed to create booking", error: error.message });
   }
 };
+
+// Note: Considered adding a dedicated notification sender
+// Send notification to chef when a booking is created (inside createBooking above)
 
 /**
  * GET ALL BOOKINGS
@@ -179,6 +199,7 @@ export const getBookings = async (req: Request, res: Response): Promise<any> => 
       .find(query)
       .populate("clientId")
       .populate("chefId")
+      .populate("procurementId")
       .populate("serviceId")
       .populate("specialMenuId")
       .sort({ createdAt: -1 })

@@ -39,7 +39,8 @@ const UserModel = new mongoose_1.Schema({
     healthInformation: {
         allergies: { type: [String] },
         healthDetails: { type: String },
-    }
+    },
+    rating: { type: Number, default: 0 }
 }, {
     timestamps: true,
     toJSON: {

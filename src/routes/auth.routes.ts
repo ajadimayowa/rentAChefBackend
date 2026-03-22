@@ -3,6 +3,7 @@ import { Router } from 'express';
 
 import { verifyToken } from '../middleware/auth.middleware';
 import { changePasswordWithOtp, chefLogin, login, register, requestPasswordChangeOtp, resendPasswordChangeOtp, verifyEmail, verifyLoginOtp } from '../controllers/chefAuthControllers/auth.controller';
+import { whoami } from '../controllers/auth.controller';
 
 const router = Router();
 
@@ -18,6 +19,9 @@ router.post('/auth/resend-password-reset-otp', resendPasswordChangeOtp);
 
 //chef auth
 router.post('/auth/chef/login', chefLogin);
+
+// get current authenticated identity (user or chef)
+router.get('/auth/me', whoami);
 
 
 

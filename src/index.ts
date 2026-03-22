@@ -20,6 +20,10 @@ import bookingRoutes from './routes/booking.routes'
 import quoteRoutes from './routes/quote.routes'
 import notificationRoutes from './routes/notification.routes';
 import procurementRoutes from './routes/procurement.routes';
+import favoriteRoutes from './routes/favorite.routes';
+import ratingRoutes from './routes/rating.routes';
+import chefRatingRoutes from './routes/chefRating.routes';
+import clientRatingRoutes from './routes/clientRating.routes';
 
 
 dotenv.config();
@@ -62,6 +66,10 @@ app.use(apiPrefix, bookingRoutes);
 app.use(apiPrefix, stateRoutes);
 app.use(apiPrefix, notificationRoutes);
 app.use(apiPrefix, procurementRoutes);
+app.use(apiPrefix, favoriteRoutes);
+app.use(apiPrefix, chefRatingRoutes);
+app.use(apiPrefix, ratingRoutes);
+app.use(apiPrefix, clientRatingRoutes);
 
 
 

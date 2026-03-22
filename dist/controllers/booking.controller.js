@@ -19,9 +19,11 @@ const Chef_1 = __importDefault(require("../models/Chef"));
 const axios_1 = __importDefault(require("axios"));
 const checkChefAvailability_1 = require("../utils/checkChefAvailability");
 const Procurement_1 = __importDefault(require("../models/Procurement"));
+const Notification_1 = __importDefault(require("../models/Notification"));
 const createBooking = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { clientId, clientNote, numberOfPeople, chefId, serviceId, categoryId, subCategoryId, specialMenuId, startDate, endDate, bookingFeeAmount, totalAmount, paymentChannel, paymentReference } = req.body;
+        console.log({ frontSent: req.body });
         if (!clientId || !startDate || !endDate || !paymentReference) {
             return res.status(400).json({ success: false, message: "Missing required fields" });
         }
@@ -98,6 +100,20 @@ const createBooking = (req, res) => __awaiter(void 0, void 0, void 0, function* 
             }
             yield booking.save();
         }
+        // Notify chef that a booking was created (if chef assigned)
+        try {
+            if (booking.chefId) {
+                yield Notification_1.default.create({
+                    userId: booking.chefId,
+                    type: 'booking-confirmation',
+                    title: 'New booking received',
+                    message: `You have a new booking (${booking._id}) scheduled from ${booking.startDate} to ${booking.endDate}`,
+                });
+            }
+        }
+        catch (err) {
+            console.error('Failed to create notification for chef on booking creation', err);
+        }
         return res.status(201).json({ success: true, message: "Booking created successfully", data: booking });
     }
     catch (error) {
@@ -109,6 +125,8 @@ const createBooking = (req, res) => __awaiter(void 0, void 0, void 0, function* 
     }
 });
 exports.createBooking = createBooking;
+// Note: Considered adding a dedicated notification sender
+// Send notification to chef when a booking is created (inside createBooking above)
 /**
  * GET ALL BOOKINGS
  * Filters + Pagination
@@ -165,6 +183,7 @@ const getBookings = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             .find(query)
             .populate("clientId")
             .populate("chefId")
+            .populate("procurementId")
             .populate("serviceId")
             .populate("specialMenuId")
             .sort({ createdAt: -1 })

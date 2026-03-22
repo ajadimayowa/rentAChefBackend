@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const auth_controller_1 = require("../controllers/chefAuthControllers/auth.controller");
+const auth_controller_2 = require("../controllers/auth.controller");
 const router = (0, express_1.Router)();
 router.post('/auth/register', auth_controller_1.register);
 router.post('/auth/verify-email', auth_controller_1.verifyEmail);
@@ -13,6 +14,8 @@ router.post('/auth/reset-password-with-otp', auth_controller_1.changePasswordWit
 router.post('/auth/resend-password-reset-otp', auth_controller_1.resendPasswordChangeOtp);
 //chef auth
 router.post('/auth/chef/login', auth_controller_1.chefLogin);
+// get current authenticated identity (user or chef)
+router.get('/auth/me', auth_controller_2.whoami);
 // router.post('/register-staff', (req, res, next) => {
 //   Promise.resolve(adminRegisterStaff(req, res)).catch(next);
 // });

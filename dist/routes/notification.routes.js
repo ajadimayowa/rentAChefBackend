@@ -7,8 +7,8 @@ const adminAuth_1 = require("../middleware/adminAuth");
 const router = (0, express_1.Router)();
 // Create notification (protected)
 router.post('/notification/create', adminAuth_1.adminAuth, notification_controller_1.createNotification);
-// Get notifications for user (protected)
-router.get('/notifications', auth_middleware_1.verifyUserToken, notification_controller_1.getNotifications);
+// Get notifications for user (public read) - requires `userId` query param or authenticated user
+router.get('/notifications', notification_controller_1.getNotifications);
 // Get single notification
 router.get('/notification/:id', auth_middleware_1.verifyUserToken, notification_controller_1.getNotification);
 // Update notification
