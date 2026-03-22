@@ -111,7 +111,7 @@ const verifyEmail = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
 });
 exports.verifyEmail = verifyEmail;
 const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    console.log('see me');
+    // console.log('see me')
     try {
         const { email, password } = req.body;
         // Validate input

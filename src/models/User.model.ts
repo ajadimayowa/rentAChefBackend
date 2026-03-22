@@ -39,6 +39,7 @@ export interface IUser extends Document {
     allergies: string[];  // Fixed typo from 'allegies' to 'allergies'
     healthDetails: string;
   };
+  rating?: number;
 }
 
 const UserModel = new Schema<IUser>({
@@ -80,6 +81,8 @@ const UserModel = new Schema<IUser>({
     allergies: { type: [String] },
     healthDetails: { type: String },
   }
+  ,
+  rating: { type: Number, default: 0 }
 },
   {
     timestamps: true,

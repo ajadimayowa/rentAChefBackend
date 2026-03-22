@@ -115,7 +115,7 @@ export const verifyEmail = async (req: Request, res: Response): Promise<any> => 
 
 
 export const login = async (req: Request, res: Response): Promise<any> => {
-  console.log('see me')
+  // console.log('see me')
   try {
     const { email, password } = req.body;
 

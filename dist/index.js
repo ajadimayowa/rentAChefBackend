@@ -24,6 +24,10 @@ const booking_routes_1 = __importDefault(require("./routes/booking.routes"));
 const quote_routes_1 = __importDefault(require("./routes/quote.routes"));
 const notification_routes_1 = __importDefault(require("./routes/notification.routes"));
 const procurement_routes_1 = __importDefault(require("./routes/procurement.routes"));
+const favorite_routes_1 = __importDefault(require("./routes/favorite.routes"));
+const rating_routes_1 = __importDefault(require("./routes/rating.routes"));
+const chefRating_routes_1 = __importDefault(require("./routes/chefRating.routes"));
+const clientRating_routes_1 = __importDefault(require("./routes/clientRating.routes"));
 dotenv_1.default.config();
 // Connect to DB
 (0, db_1.default)().catch((err) => {
@@ -58,6 +62,10 @@ app.use(apiPrefix, booking_routes_1.default);
 app.use(apiPrefix, stateRoutes_1.default);
 app.use(apiPrefix, notification_routes_1.default);
 app.use(apiPrefix, procurement_routes_1.default);
+app.use(apiPrefix, favorite_routes_1.default);
+app.use(apiPrefix, chefRating_routes_1.default);
+app.use(apiPrefix, rating_routes_1.default);
+app.use(apiPrefix, clientRating_routes_1.default);
 // Server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

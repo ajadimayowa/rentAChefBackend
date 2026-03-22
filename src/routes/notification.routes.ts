@@ -16,8 +16,8 @@ const router = Router();
 // Create notification (protected)
 router.post('/notification/create', adminAuth, createNotification);
 
-// Get notifications for user (protected)
-router.get('/notifications', verifyUserToken, getNotifications);
+// Get notifications for user (public read) - requires `userId` query param or authenticated user
+router.get('/notifications', getNotifications);
 
 
 // Get single notification
