@@ -20,6 +20,7 @@ const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const otpUtils_1 = require("../../utils/otpUtils");
 const usersEmailNotifs_1 = require("../../services/email/rentAChef/usersEmailNotifs");
 const Chef_1 = __importDefault(require("../../models/Chef"));
+const sendSms_1 = require("../../services/sms/sendSms");
 const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { email, password, fullName, phoneNumber } = req.body;
     if (!email || !password || !fullName || !phoneNumber) {
@@ -27,7 +28,7 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     }
     const formatedEmail = email.trim().toLowerCase();
     try {
-        const existing = yield User_model_1.default.findOne({ formatedEmail });
+        const existing = yield User_model_1.default.findOne({ email: formatedEmail });
         if (existing) {
             return res.status(400).json({ success: false, message: 'A user with this email already exist.' });
         }
@@ -37,11 +38,22 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         const emailVerificationOtp = (0, otpUtils_1.generateOtp)();
         const user = yield User_model_1.default.create({ email: formatedEmail, phone: phoneNumber, emailVerificationOtp, password: hashed, fullName, firstName, isAdmin });
         // console.log({ seeEmailVerOtp: emailVerificationOtp })
-        yield (0, usersEmailNotifs_1.sendEmailVerificationOtp)({
-            firstName,
-            email: formatedEmail,
-            emailVerificationOtp,
-        });
+        // await sendEmailVerificationOtp({
+        //   firstName,
+        //   email: formatedEmail,
+        //   emailVerificationOtp,
+        // })
+        console.log({ seePhone: user.phone });
+        try {
+            yield (0, sendSms_1.sendSms)({
+                to: user.phone,
+                message: `Your RentAChef verification code is ${emailVerificationOtp}`,
+            });
+        }
+        catch (err) {
+            console.error(err);
+            // decide whether to retry, notify, or continue
+        }
         // const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'secret', { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
         return res.status(201).json({ success: true, payload: { id: user._id, email: user.email, fullName: user.fullName, isAdmin: user.isAdmin } });
     }
@@ -149,20 +161,30 @@ const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         yield user.save();
         console.log({ seeOtp: otp });
         // Send OTP via email
+        // try {
+        //   await sendLoginOtpEmail({
+        //     firstName: user.firstName,
+        //     email: user.email,
+        //     loginOtp: otp,
+        //   });
+        // } catch (error) {
+        //   console.error("Error sending OTP email:", error);
+        //   // Don't block login flow if email fails, just log it
+        // }
+        console.log({ seePhone: user.phone });
         try {
-            yield (0, usersEmailNotifs_1.sendLoginOtpEmail)({
-                firstName: user.firstName,
-                email: user.email,
-                loginOtp: otp,
+            yield (0, sendSms_1.sendSms)({
+                to: user.phone,
+                message: `Your RentAChef login OTP code is ${otp}`,
             });
         }
-        catch (error) {
-            console.error("Error sending OTP email:", error);
-            // Don't block login flow if email fails, just log it
+        catch (err) {
+            console.error(err);
+            // decide whether to retry, notify, or continue
         }
         return res.status(200).json({
             success: true,
-            message: "OTP sent to email.",
+            message: "OTP sent to phone.",
             payload: {
                 email: user.email,
                 expiresAt: otpExpires,
@@ -226,7 +248,7 @@ const verifyLoginOtp = (req, res) => __awaiter(void 0, void 0, void 0, function*
         const token = jsonwebtoken_1.default.sign({ id: customer._id, email: customer.email, isAdmin: customer.isAdmin }, process.env.JWT_SECRET, { expiresIn: "7d" });
         // Send OTP via email
         // try {
-        //     await sendLoginSuccessEmail({
+        //   await sendLoginSuccessEmail({
         //     firstName: customer.firstName,
         //     email: customer.email,
         //   });
@@ -274,20 +296,30 @@ const requestPasswordChangeOtp = (req, res) => __awaiter(void 0, void 0, void 0,
         //   `Your password reset OTP is ${otp}. It expires in 10 minutes.`
         // );
         // Send OTP via email
+        // try {
+        //   await sendUserPasswordResetOTPEmail({
+        //     firstName: user.firstName,
+        //     email: user.email,
+        //     loginOtp: otp,
+        //   });
+        // } catch (error) {
+        //   console.error("Error sending OTP email:", error);
+        //   // Don't block login flow if email fails, just log it
+        // }
+        console.log({ seePhone: user.phone });
         try {
-            yield (0, usersEmailNotifs_1.sendUserPasswordResetOTPEmail)({
-                firstName: user.firstName,
-                email: user.email,
-                loginOtp: otp,
+            yield (0, sendSms_1.sendSms)({
+                to: user.phone,
+                message: `Your RentAChef Password reset code is ${otp}`,
             });
         }
-        catch (error) {
-            console.error("Error sending OTP email:", error);
-            // Don't block login flow if email fails, just log it
+        catch (err) {
+            console.error(err);
+            // decide whether to retry, notify, or continue
         }
         return res.status(200).json({
             success: true,
-            message: 'Password reset OTP sent to email',
+            message: 'Password reset code sent to phone',
         });
     }
     catch (error) {
@@ -320,15 +352,14 @@ const changePasswordWithOtp = (req, res) => __awaiter(void 0, void 0, void 0, fu
         user.loginOtp = undefined;
         user.loginOtpExpires = undefined;
         yield user.save();
-        try {
-            yield (0, usersEmailNotifs_1.sendPasswordChangeSuccessEmail)({
-                firstName: user.firstName,
-                email: user.email,
-            });
-        }
-        catch (error) {
-            console.log(error);
-        }
+        // try {
+        //   await sendPasswordChangeSuccessEmail({
+        //     firstName: user.firstName,
+        //     email: user.email,
+        //   });
+        // } catch (error) {
+        //   console.log(error)
+        // }
         return res.status(200).json({
             success: true,
             message: 'Password changed successfully',

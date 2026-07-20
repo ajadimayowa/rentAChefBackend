@@ -15,16 +15,35 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.isCreator = exports.isSuperAdmin = exports.verifyUserToken = exports.verifyToken = void 0;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const User_model_1 = __importDefault(require("../models/User.model"));
-const verifyToken = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+const getTokenFromRequest = (req) => {
     const authHeader = req.headers.authorization;
-    if (!authHeader) {
+    const xAccessToken = req.headers['x-access-token'];
+    const raw = authHeader || (Array.isArray(xAccessToken) ? xAccessToken[0] : xAccessToken);
+    if (!raw || typeof raw !== 'string')
+        return null;
+    // Accept both "Bearer <token>" and raw token values.
+    if (raw.toLowerCase().startsWith('bearer ')) {
+        return raw.slice(7).trim();
+    }
+    return raw.trim();
+};
+const getDecodedUserId = (decoded) => {
+    return (decoded === null || decoded === void 0 ? void 0 : decoded.id) || (decoded === null || decoded === void 0 ? void 0 : decoded._id) || (decoded === null || decoded === void 0 ? void 0 : decoded.userId) || (decoded === null || decoded === void 0 ? void 0 : decoded.sub);
+};
+const verifyToken = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    const token = getTokenFromRequest(req);
+    if (!token) {
         res.status(401).json({ msg: 'No token provided' });
         return;
     }
     try {
-        const token = authHeader.split(' ')[1];
         const decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET);
-        const user = yield User_model_1.default.findById(decoded.id);
+        const userId = getDecodedUserId(decoded);
+        if (!userId) {
+            res.status(401).json({ msg: 'Token payload missing user id' });
+            return;
+        }
+        const user = yield User_model_1.default.findById(userId);
         if (!user) {
             res.status(403).json({ msg: 'Invalid token' });
             return;
@@ -62,16 +81,19 @@ exports.verifyToken = verifyToken;
 //   }
 // };
 const verifyUserToken = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
+    const token = getTokenFromRequest(req);
+    if (!token) {
         res.status(401).json({ msg: 'No token provided' });
         return;
     }
     try {
-        const token = authHeader.split(' ')[1];
         const decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET);
-        console.log("decoded", decoded);
-        const user = yield User_model_1.default.findById(decoded.id);
+        const userId = getDecodedUserId(decoded);
+        if (!userId) {
+            res.status(401).json({ msg: 'Token payload missing user id' });
+            return;
+        }
+        const user = yield User_model_1.default.findById(userId);
         if (!user) {
             res.status(403).json({ msg: 'Invalid token' });
             return;

@@ -70,4 +70,5 @@ var BookingWorkflow;
     BookingWorkflow["EVENT_CATERING"] = "EVENT_CATERING";
     BookingWorkflow["STORAGE_PACKAGE"] = "STORAGE_PACKAGE";
     BookingWorkflow["SPECIAL_SERVICE"] = "SPECIAL_SERVICE";
+    BookingWorkflow["HOME_RESIDENCE"] = "HOME_RESIDENCE";
 })(BookingWorkflow || (exports.BookingWorkflow = BookingWorkflow = {}));

@@ -2,18 +2,42 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import UserModel from '../models/User.model';
 
-export const verifyToken = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+const getTokenFromRequest = (req: Request): string | null => {
   const authHeader = req.headers.authorization;
-  if (!authHeader) {
+  const xAccessToken = req.headers['x-access-token'];
+  const raw = authHeader || (Array.isArray(xAccessToken) ? xAccessToken[0] : xAccessToken);
+
+  if (!raw || typeof raw !== 'string') return null;
+
+  // Accept both "Bearer <token>" and raw token values.
+  if (raw.toLowerCase().startsWith('bearer ')) {
+    return raw.slice(7).trim();
+  }
+
+  return raw.trim();
+};
+
+const getDecodedUserId = (decoded: any): string | undefined => {
+  return decoded?.id || decoded?._id || decoded?.userId || decoded?.sub;
+};
+
+export const verifyToken = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  const token = getTokenFromRequest(req);
+  if (!token) {
     res.status(401).json({ msg: 'No token provided' });
     return;
   }
 
   try {
-    const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
+    const userId = getDecodedUserId(decoded);
 
-    const user = await UserModel.findById(decoded.id);
+    if (!userId) {
+      res.status(401).json({ msg: 'Token payload missing user id' });
+      return;
+    }
+
+    const user = await UserModel.findById(userId);
     if (!user) {
       res.status(403).json({ msg: 'Invalid token' });
       return;
@@ -56,23 +80,24 @@ export const verifyToken = async (req: Request, res: Response, next: NextFunctio
 
 
 export const verifyUserToken = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
- 
-  const authHeader = req.headers.authorization;
-  
-  if (!authHeader) {
+  const token = getTokenFromRequest(req);
+
+  if (!token) {
     res.status(401).json({ msg: 'No token provided' });
     return;
   }
 
   try {
-    const token = authHeader.split(' ')[1];
-    
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
-    console.log("decoded",decoded);
-    const user = await UserModel.findById(decoded.id);
+    const userId = getDecodedUserId(decoded);
+
+    if (!userId) {
+      res.status(401).json({ msg: 'Token payload missing user id' });
+      return;
+    }
+
+    const user = await UserModel.findById(userId);
     
-    
-   
     if (!user) {
       res.status(403).json({ msg: 'Invalid token' });
       return;
