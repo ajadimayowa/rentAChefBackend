@@ -4,8 +4,8 @@ import { generateToken } from "../../utils/generateToken";
 import Chef from "../../models/Chef";
 import UserModel from "../../models/User.model";
 import Category from "../../models/Category";
-import { Service } from "../../models/Service";
-import { Booking } from "../../models/Booking";
+import { ServiceModel } from "../../models/Service";
+import { BookingModel } from "../../models/Booking";
 
 export const adminLogin = async (req: Request, res: Response): Promise<any> => {
   try {
@@ -31,7 +31,7 @@ export const adminLogin = async (req: Request, res: Response): Promise<any> => {
       .select('_id name') // only fetch what you need
       .lean();
 
-    const services = await Service.find()
+    const services = await ServiceModel.find()
       .select('_id name') // only fetch what you need
       .lean();
 
@@ -160,7 +160,7 @@ export const getAdminDashboard = async (req: Request, res: Response): Promise<an
     ]);
 
     // compute total revenue from confirmed bookings (sum of totalAmount)
-    const revenueAgg = await Booking.aggregate([
+    const revenueAgg = await BookingModel.aggregate([
       { $match: { status: 'confirmed' } },
       { $group: { _id: null, totalRevenue: { $sum: { $ifNull: ["$totalAmount", 0] } } } }
     ]);
@@ -170,7 +170,7 @@ export const getAdminDashboard = async (req: Request, res: Response): Promise<an
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth() - 5, 1, 0, 0, 0, 0);
 
-    const trendsAgg = await Booking.aggregate([
+    const trendsAgg = await BookingModel.aggregate([
       { $match: { status: 'confirmed', createdAt: { $gte: start } } },
       { $group: { _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } }, count: { $sum: 1 } } },
       { $sort: { '_id.year': 1, '_id.month': 1 } }

@@ -1,28 +1,36 @@
-import { Schema, model, Document, Types } from "mongoose";
+import mongoose, { Schema, Document, Model } from "mongoose";
 
 export interface IQuote extends Document {
   title: string;
   description: string;
-  clientId: Types.ObjectId;
-  createdAt: Date;
-  updatedAt: Date;
+  customerId: Schema.Types.ObjectId;
+  status: "PENDING" | "RESPONDED" | "CLOSED";
+  adminResponse?: IQuoteAdminResponse;
+}
+
+export interface IQuoteAdminResponse {
+  message: string;
+  respondedBy: Schema.Types.ObjectId;
+  respondedAt: Date;
 }
 
 const QuoteSchema = new Schema<IQuote>(
   {
-    title: {
+    title: { type: String, required: true, trim: true },
+    description: { type: String, required: true, trim: true },
+    customerId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
+
+    status: {
       type: String,
-      required: true,
-      trim: true,
+      enum: ["PENDING", "RESPONDED", "CLOSED"],
+      default: "PENDING",
+      index: true,
     },
-    description: {
-      type: String,
-      required: true,
-    },
-    clientId: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
+
+    adminResponse: {
+      message: { type: String, trim: true },
+      respondedBy: { type: Schema.Types.ObjectId, ref: "User" },
+      respondedAt: { type: Date },
     },
   },
   {
@@ -39,4 +47,8 @@ const QuoteSchema = new Schema<IQuote>(
   }
 );
 
-export default model<IQuote>("Quote", QuoteSchema);
+QuoteSchema.index({ customerId: 1, createdAt: -1 });
+
+export const QuoteModel: Model<IQuote> =
+  (mongoose.models.CustomerQuote as Model<IQuote>) ||
+  mongoose.model<IQuote>("CustomerQuote", QuoteSchema, "customer_quotes");

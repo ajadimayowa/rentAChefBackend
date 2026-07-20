@@ -24,7 +24,7 @@ const createProcurement = (req, res) => __awaiter(void 0, void 0, void 0, functi
             return res.status(400).json({ success: false, message: 'bookingId and items are required' });
         }
         // ensure booking exists
-        const booking = yield Booking_1.Booking.findById(bookingId);
+        const booking = yield Booking_1.BookingModel.findById(bookingId);
         if (!booking)
             return res.status(404).json({ success: false, message: 'Booking not found' });
         const createPayload = { bookingId, items };
@@ -36,12 +36,12 @@ const createProcurement = (req, res) => __awaiter(void 0, void 0, void 0, functi
             createPayload.paymentReference = paymentReference;
         const procurement = yield Procurement_1.default.create(createPayload);
         // attach procurement to booking
-        booking.procurementId = procurement._id;
+        booking.procurement = procurement._id;
         yield booking.save();
         // Notify customer that procurement has been added to their booking
         try {
             yield Notification_1.default.create({
-                userId: booking.clientId,
+                userId: booking.customerId,
                 type: 'procurement-update',
                 title: 'Procurement added to booking',
                 message: `Additional procurement items were added to your booking. Total: ${procurement.totalCost}`,
@@ -74,10 +74,10 @@ const userPayProcurement = (req, res) => __awaiter(void 0, void 0, void 0, funct
         if (!procurement)
             return res.status(404).json({ success: false, message: 'Procurement not found' });
         // ensure procurement belongs to a booking owned by user
-        const booking = yield Booking_1.Booking.findById(procurement.bookingId);
+        const booking = yield Booking_1.BookingModel.findById(procurement.bookingId);
         if (!booking)
             return res.status(404).json({ success: false, message: 'Associated booking not found' });
-        if (String(booking.clientId) !== String(user._id))
+        if (String(booking.customerId) !== String(user._id))
             return res.status(403).json({ success: false, message: 'Not allowed to pay this procurement' });
         // reuse existing mark logic for paystack or transfer
         if (paymentChannel === 'transfer') {
@@ -260,9 +260,9 @@ const deleteProcurement = (req, res) => __awaiter(void 0, void 0, void 0, functi
             return res.status(404).json({ success: false, message: 'Procurement not found' });
         // unlink from booking if attached
         try {
-            const booking = yield Booking_1.Booking.findById(procurement.bookingId);
-            if (booking && String(booking.procurementId) === String(procurement._id)) {
-                booking.procurementId = undefined;
+            const booking = yield Booking_1.BookingModel.findById(procurement.bookingId);
+            if (booking && String(booking.procurement) === String(procurement._id)) {
+                booking.procurement = undefined;
                 yield booking.save();
             }
         }

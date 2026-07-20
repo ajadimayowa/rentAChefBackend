@@ -8,9 +8,10 @@ import { sendLoginSuccessEmail, sendPasswordChangeSuccessEmail, sendUserPassword
 import { sendChefCreationSuccessEmail } from "../services/email/rentAChef/chefsEmailNotification";
 import Category from "../models/Category";
 import { ChefService } from "../models/ChefService";
-import { Booking, IBooking } from "../models/Booking";
+import { BookingModel} from "../models/Booking";
 import { generateOtp } from "../utils/otpUtils";
 import { isChefAvailable } from "../utils/checkChefAvailability";
+import Menu from "../models/Menu";
 
 
 export const createChef = async (req: Request, res: Response): Promise<any> => {
@@ -271,25 +272,77 @@ export const getAllChefs = async (req: Request, res: Response): Promise<any> => 
     const skip = (page - 1) * limit;
 
     // Filters
-    const { location, state, isActive, name } = req.query;
+    const getQueryValue = (...keys: string[]): string | undefined => {
+      for (const key of keys) {
+        const raw = req.query[key];
+        const value = Array.isArray(raw) ? raw[0] : raw;
+
+        if (value !== undefined && value !== null) {
+          const trimmed = String(value).trim();
+          if (trimmed) return trimmed;
+        }
+      }
+      return undefined;
+    };
+
+    const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+    const location = getQueryValue("location", "lga");
+    const state = getQueryValue("state", "stateName");
+    const isActiveQuery = getQueryValue("isActive", "active");
+    const name = getQueryValue("name", "search", "q");
+    const category = getQueryValue("category", "categoryId", "categoryName", "chefCategoryId");
 
     const filter: any = {};
 
     if (location) {
-      filter.location = location;
+      filter.location = { $regex: escapeRegex(location), $options: "i" };
     }
 
     if (state) {
-      filter.state = state;
+      filter.state = { $regex: escapeRegex(state), $options: "i" };
     }
 
-    if (isActive !== undefined) {
-      filter.isActive = isActive === "true";
+    if (isActiveQuery !== undefined) {
+      const normalizedActive = isActiveQuery.toLowerCase();
+      if (["true", "1", "yes"].includes(normalizedActive)) {
+        filter.isActive = true;
+      } else if (["false", "0", "no"].includes(normalizedActive)) {
+        filter.isActive = false;
+      }
     }
 
     // 🔍 Search by chef name (case-insensitive, partial match)
     if (name) {
-      filter.name = { $regex: name, $options: "i" };
+      filter.name = { $regex: escapeRegex(name), $options: "i" };
+    }
+
+    if (category) {
+      const categoryQuery = String(category).trim();
+
+      if (mongoose.Types.ObjectId.isValid(categoryQuery)) {
+        filter.category = categoryQuery;
+      } else {
+        const escapedCategory = escapeRegex(categoryQuery);
+        const matchedCategory = await Category.findOne({
+          name: { $regex: `^${escapedCategory}$`, $options: "i" },
+        }).select("_id");
+
+        if (!matchedCategory) {
+          return res.status(200).json({
+            success: true,
+            meta: {
+              total: 0,
+              page,
+              limit,
+              totalPages: 0,
+            },
+            payload: [],
+          });
+        }
+
+        filter.category = matchedCategory._id;
+      }
     }
 
     // Query
@@ -346,13 +399,12 @@ export const getChefById = async (req: Request, res: Response): Promise<void> =>
     // compute booking counts
     const now = new Date();
     const [totalChefBooking, totalCompletedBooking, totalUpcoming] = await Promise.all([
-      Booking.countDocuments({ chefId: id }),
-      Booking.countDocuments({ chefId: id, status: 'completed' }),
-      Booking.countDocuments({ chefId: id, status: { $in: ['confirmed', 'ongoing'] }, startDate: { $gte: now } }),
+      BookingModel.countDocuments({ chefId: id }),
+      BookingModel.countDocuments({ chefId: id, status: 'completed' }),
+      BookingModel.countDocuments({ chefId: id, status: { $in: ['confirmed', 'ongoing'] }, startDate: { $gte: now } }),
     ]);
 
     // fetch recent menus for this chef (last 3)
-    const { Menu } = await import('../models/Menu');
     const getTheChefMenu = await Menu.find({ chefId: id }).sort({ createdAt: -1 }).limit(3).lean();
 
     // fetch services offered via ChefService

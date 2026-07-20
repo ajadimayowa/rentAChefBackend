@@ -4,7 +4,8 @@ import { initializePayment, verifyPayment } from "../controllers/payment.control
 
 const router = Router();
 
-router.post("/payment/initialize-payment",verifyUserToken, initializePayment);   
+// router.post("/payment/initialize-payment",verifyUserToken, initializePayment);   
+router.post("/payment/initialize-payment",verifyUserToken, initializePayment);  
 router.post("/payment/verify/:reference",verifyUserToken, verifyPayment);  
 
 export default router;

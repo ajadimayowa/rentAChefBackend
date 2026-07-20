@@ -57,6 +57,7 @@ const ChefService_1 = require("../models/ChefService");
 const Booking_1 = require("../models/Booking");
 const otpUtils_1 = require("../utils/otpUtils");
 const checkChefAvailability_1 = require("../utils/checkChefAvailability");
+const Menu_1 = __importDefault(require("../models/Menu"));
 const createChef = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const chefPic = req.file; // multer file
@@ -262,20 +263,68 @@ const getAllChefs = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         const limit = Math.max(Number(req.query.limit) || 10, 1);
         const skip = (page - 1) * limit;
         // Filters
-        const { location, state, isActive, name } = req.query;
+        const getQueryValue = (...keys) => {
+            for (const key of keys) {
+                const raw = req.query[key];
+                const value = Array.isArray(raw) ? raw[0] : raw;
+                if (value !== undefined && value !== null) {
+                    const trimmed = String(value).trim();
+                    if (trimmed)
+                        return trimmed;
+                }
+            }
+            return undefined;
+        };
+        const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const location = getQueryValue("location", "lga");
+        const state = getQueryValue("state", "stateName");
+        const isActiveQuery = getQueryValue("isActive", "active");
+        const name = getQueryValue("name", "search", "q");
+        const category = getQueryValue("category", "categoryId", "categoryName", "chefCategoryId");
         const filter = {};
         if (location) {
-            filter.location = location;
+            filter.location = { $regex: escapeRegex(location), $options: "i" };
         }
         if (state) {
-            filter.state = state;
+            filter.state = { $regex: escapeRegex(state), $options: "i" };
         }
-        if (isActive !== undefined) {
-            filter.isActive = isActive === "true";
+        if (isActiveQuery !== undefined) {
+            const normalizedActive = isActiveQuery.toLowerCase();
+            if (["true", "1", "yes"].includes(normalizedActive)) {
+                filter.isActive = true;
+            }
+            else if (["false", "0", "no"].includes(normalizedActive)) {
+                filter.isActive = false;
+            }
         }
         // 🔍 Search by chef name (case-insensitive, partial match)
         if (name) {
-            filter.name = { $regex: name, $options: "i" };
+            filter.name = { $regex: escapeRegex(name), $options: "i" };
+        }
+        if (category) {
+            const categoryQuery = String(category).trim();
+            if (mongoose_1.default.Types.ObjectId.isValid(categoryQuery)) {
+                filter.category = categoryQuery;
+            }
+            else {
+                const escapedCategory = escapeRegex(categoryQuery);
+                const matchedCategory = yield Category_1.default.findOne({
+                    name: { $regex: `^${escapedCategory}$`, $options: "i" },
+                }).select("_id");
+                if (!matchedCategory) {
+                    return res.status(200).json({
+                        success: true,
+                        meta: {
+                            total: 0,
+                            page,
+                            limit,
+                            totalPages: 0,
+                        },
+                        payload: [],
+                    });
+                }
+                filter.category = matchedCategory._id;
+            }
         }
         // Query
         const [chefs, total] = yield Promise.all([
@@ -325,13 +374,12 @@ const getChefById = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         // compute booking counts
         const now = new Date();
         const [totalChefBooking, totalCompletedBooking, totalUpcoming] = yield Promise.all([
-            Booking_1.Booking.countDocuments({ chefId: id }),
-            Booking_1.Booking.countDocuments({ chefId: id, status: 'completed' }),
-            Booking_1.Booking.countDocuments({ chefId: id, status: { $in: ['confirmed', 'ongoing'] }, startDate: { $gte: now } }),
+            Booking_1.BookingModel.countDocuments({ chefId: id }),
+            Booking_1.BookingModel.countDocuments({ chefId: id, status: 'completed' }),
+            Booking_1.BookingModel.countDocuments({ chefId: id, status: { $in: ['confirmed', 'ongoing'] }, startDate: { $gte: now } }),
         ]);
         // fetch recent menus for this chef (last 3)
-        const { Menu } = yield Promise.resolve().then(() => __importStar(require('../models/Menu')));
-        const getTheChefMenu = yield Menu.find({ chefId: id }).sort({ createdAt: -1 }).limit(3).lean();
+        const getTheChefMenu = yield Menu_1.default.find({ chefId: id }).sort({ createdAt: -1 }).limit(3).lean();
         // fetch services offered via ChefService
         const { ChefService } = yield Promise.resolve().then(() => __importStar(require('../models/ChefService')));
         const services = yield ChefService.find({ chefId: id, isAvailable: true }).populate('serviceId', 'name').lean();

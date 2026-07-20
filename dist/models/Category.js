@@ -71,6 +71,10 @@ const categorySchema = new mongoose_1.Schema({
         type: Boolean,
         default: true,
     },
+    tasks: {
+        type: [String],
+        default: [],
+    },
 }, {
     timestamps: true,
     toJSON: {

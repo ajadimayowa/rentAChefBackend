@@ -29,19 +29,19 @@ const addOrUpdateChefRating = (req, res) => __awaiter(void 0, void 0, void 0, fu
         if (!bookingId)
             return res.status(400).json({ success: false, message: 'bookingId is required' });
         // validate booking
-        const booking = yield Booking_1.Booking.findById(bookingId);
+        const booking = yield Booking_1.BookingModel.findById(bookingId);
         if (!booking)
             return res.status(404).json({ success: false, message: 'Booking not found' });
         // only the booking client can rate
-        if (booking.clientId.toString() !== user.id) {
+        if (booking.customerId.toString() !== user.id) {
             return res.status(403).json({ success: false, message: 'You can only rate your own bookings' });
         }
-        // booking must be for this chef and of type 'chef'
-        if (booking.bookingType !== 'chef' || (booking.chefId && booking.chefId.toString() !== chefId)) {
+        // booking must be for this chef
+        if (!booking.chefId || booking.chefId.toString() !== chefId) {
             return res.status(400).json({ success: false, message: 'Booking does not belong to this chef' });
         }
         // require completed bookings for rating
-        if (booking.status !== 'completed') {
+        if (booking.status !== 'Completed') {
             return res.status(400).json({ success: false, message: 'Booking must be completed to submit a rating' });
         }
         if (!rating || Number(rating) < 1 || Number(rating) > 5) {

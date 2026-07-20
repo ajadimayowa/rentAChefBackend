@@ -3,16 +3,23 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
 export interface INotification extends Document {
-  userId: mongoose.Types.ObjectId;
-  type: string;
+  userId?: mongoose.Types.ObjectId;
+  recipientUserId?: mongoose.Types.ObjectId;
+  type?: string;
+  channel?: 'PUSH' | 'EMAIL' | 'SMS' | 'IN_APP';
   title: string;
-  message: string;
+  message?: string;
+  body?: string;
+  metadata?: Record<string, unknown>;
   isRead: boolean;
+  sentAt?: Date;
+  readAt?: Date;
   createdAt: Date;
 }
 
 const NotificationSchema: Schema = new Schema({
-  userId: { type: mongoose.Types.ObjectId, ref: 'User', required: true },
+  userId: { type: mongoose.Types.ObjectId, ref: 'User', index: true },
+  recipientUserId: { type: mongoose.Types.ObjectId, ref: 'User', index: true },
   type: {
     type: String,
     enum: [
@@ -28,11 +35,19 @@ const NotificationSchema: Schema = new Schema({
       'event-invitation',
       'system-alert'
     ],
-    required: true
+  },
+  channel: {
+    type: String,
+    enum: ['PUSH', 'EMAIL', 'SMS', 'IN_APP'],
+    index: true,
   },
   title: { type: String, required: true },
-  message: { type: String, required: true },
+  message: { type: String },
+  body: { type: String },
+  metadata: { type: Schema.Types.Mixed },
   isRead: { type: Boolean, default: false },
+  sentAt: { type: Date },
+  readAt: { type: Date },
 }, {
     timestamps: true,
     toJSON: {
@@ -45,5 +60,7 @@ const NotificationSchema: Schema = new Schema({
       },
     },
   });
+
+NotificationSchema.index({ recipientUserId: 1, createdAt: -1 });
 
 export default mongoose.model<INotification>('Notification', NotificationSchema);

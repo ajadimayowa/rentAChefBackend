@@ -2,36 +2,46 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose_1 = require("mongoose");
 const ChefSchema = new mongoose_1.Schema({
-    staffId: { type: String, required: true },
-    name: { type: String, required: true },
+    userId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'User', index: true },
+    staffId: { type: String },
+    name: { type: String },
     gender: {
         type: String,
         enum: ['m', 'f'],
-        required: true
     },
-    email: { type: String, required: true },
+    email: { type: String, index: true },
     bio: { type: String },
     specialties: { type: [String], default: [] },
     category: {
         type: mongoose_1.Schema.Types.ObjectId,
         ref: "Category",
-        required: true,
     },
-    phoneNumber: { type: Number, required: true },
-    location: { type: String, required: true },
-    state: { type: String, required: true },
-    stateId: { type: Number, required: true },
+    phoneNumber: { type: Number },
+    location: { type: String },
+    state: { type: String },
+    stateId: { type: Number },
     profilePic: { type: String },
     menus: [{ type: mongoose_1.Schema.Types.ObjectId, ref: "Menu" }],
+    level: { type: String, enum: ['JUNIOR', 'SENIOR', 'EXECUTIVE'], index: true },
+    servicesOffered: [{ type: mongoose_1.Schema.Types.ObjectId, ref: 'Service' }],
+    availability: [
+        {
+            start: { type: Date, index: true },
+            end: { type: Date, index: true },
+            isBooked: { type: Boolean, default: false },
+            zone: { type: String },
+        },
+    ],
     loginOtp: { type: String },
     loginOtpExpires: { type: Date },
     password: { type: String, default: null },
     isPasswordUpdated: { type: Boolean, default: false },
     isActive: { type: Boolean, default: false },
-    createdAt: { type: Date, default: Date.now },
     dob: { type: Date },
-    yearsOfExperience: { type: Number, default: 7 },
-    rating: { type: Number, default: 2 },
+    yearsOfExperience: { type: Number, default: 0 },
+    rating: { type: Number, default: 0 },
+    experienceYears: { type: Number, default: 0 },
+    certifications: [{ type: String }],
 }, {
     timestamps: true,
     toJSON: {
@@ -44,5 +54,6 @@ const ChefSchema = new mongoose_1.Schema({
         },
     },
 });
-ChefSchema.index({ staffId: 1, phoneNumber: 1 }, { unique: true });
+ChefSchema.index({ level: 1, isActive: 1 });
+ChefSchema.index({ servicesOffered: 1, level: 1 });
 exports.default = (0, mongoose_1.model)("Chef", ChefSchema);

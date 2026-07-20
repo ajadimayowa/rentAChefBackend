@@ -12,8 +12,15 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteCategory = exports.updateCategory = exports.getSingleCategory = exports.getAllCategories = exports.createCategory = void 0;
+exports.deleteCategoryTask = exports.updateCategoryTask = exports.addTaskToCategory = exports.deleteCategory = exports.updateCategory = exports.getSingleCategory = exports.getAllCategories = exports.createCategory = void 0;
 const Category_1 = __importDefault(require("../../models/Category"));
+const parseTaskIndex = (taskIndexParam) => {
+    const parsedIndex = Number(taskIndexParam);
+    if (!Number.isInteger(parsedIndex) || parsedIndex < 0) {
+        return null;
+    }
+    return parsedIndex;
+};
 /**
  * Create Category
  */
@@ -100,3 +107,85 @@ const deleteCategory = (req, res) => __awaiter(void 0, void 0, void 0, function*
     }
 });
 exports.deleteCategory = deleteCategory;
+/**
+ * Add Task to Category
+ */
+const addTaskToCategory = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { id } = req.params;
+        const task = String(req.body.task || "").trim();
+        if (!task) {
+            return res.status(400).json({ success: false, message: "task is required" });
+        }
+        const category = yield Category_1.default.findById(id);
+        if (!category) {
+            return res.status(404).json({ success: false, message: "Category not found" });
+        }
+        if (category.tasks.includes(task)) {
+            return res.status(409).json({ success: false, message: "Task already exists in category" });
+        }
+        category.tasks.push(task);
+        yield category.save();
+        return res.status(200).json({ success: true, payload: category });
+    }
+    catch (error) {
+        return res.status(400).json({ success: false, message: error.message });
+    }
+});
+exports.addTaskToCategory = addTaskToCategory;
+/**
+ * Update Category Task
+ */
+const updateCategoryTask = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { id, taskIndex } = req.params;
+        const updatedTask = String(req.body.task || "").trim();
+        if (!updatedTask) {
+            return res.status(400).json({ success: false, message: "task is required" });
+        }
+        const parsedTaskIndex = parseTaskIndex(taskIndex);
+        if (parsedTaskIndex === null) {
+            return res.status(400).json({ success: false, message: "taskIndex must be a valid non-negative integer" });
+        }
+        const category = yield Category_1.default.findById(id);
+        if (!category) {
+            return res.status(404).json({ success: false, message: "Category not found" });
+        }
+        if (parsedTaskIndex >= category.tasks.length) {
+            return res.status(404).json({ success: false, message: "Task not found" });
+        }
+        category.tasks[parsedTaskIndex] = updatedTask;
+        yield category.save();
+        return res.status(200).json({ success: true, payload: category });
+    }
+    catch (error) {
+        return res.status(400).json({ success: false, message: error.message });
+    }
+});
+exports.updateCategoryTask = updateCategoryTask;
+/**
+ * Delete Category Task
+ */
+const deleteCategoryTask = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { id, taskIndex } = req.params;
+        const parsedTaskIndex = parseTaskIndex(taskIndex);
+        if (parsedTaskIndex === null) {
+            return res.status(400).json({ success: false, message: "taskIndex must be a valid non-negative integer" });
+        }
+        const category = yield Category_1.default.findById(id);
+        if (!category) {
+            return res.status(404).json({ success: false, message: "Category not found" });
+        }
+        if (parsedTaskIndex >= category.tasks.length) {
+            return res.status(404).json({ success: false, message: "Task not found" });
+        }
+        category.tasks.splice(parsedTaskIndex, 1);
+        yield category.save();
+        return res.status(200).json({ success: true, payload: category });
+    }
+    catch (error) {
+        return res.status(400).json({ success: false, message: error.message });
+    }
+});
+exports.deleteCategoryTask = deleteCategoryTask;

@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import UserModel from '../models/User.model';
 import Chef from '../models/Chef';
 import Procurement from '../models/Procurement';
-import { Booking } from '../models/Booking';
+import { BookingModel } from '../models/Booking';
 
 export const adminOrBookingChef = async (req: Request, res: Response, next: NextFunction):Promise<any>  => {
   const authHeader = req.headers.authorization;
@@ -31,7 +31,7 @@ export const adminOrBookingChef = async (req: Request, res: Response, next: Next
       const procurement = await Procurement.findById(procurementId);
       if (!procurement) return res.status(404).json({ message: 'Procurement not found' });
 
-      const booking = await Booking.findById(procurement.bookingId);
+      const booking = await BookingModel.findById(procurement.bookingId);
       if (!booking) return res.status(404).json({ message: 'Booking not found for procurement' });
 
       if (String(booking.chefId) !== String(chef._id)) {

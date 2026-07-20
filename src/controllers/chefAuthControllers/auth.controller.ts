@@ -254,14 +254,14 @@ export const verifyLoginOtp = async (req: Request, res: Response): Promise<any> 
 
     // Send OTP via email
     
-    try {
-        await sendLoginSuccessEmail({
-        firstName: customer.firstName,
-        email: customer.email,
-      });
-    } catch (error) {
-      console.log(error)
-    }
+    // try {
+    //     await sendLoginSuccessEmail({
+    //     firstName: customer.firstName,
+    //     email: customer.email,
+    //   });
+    // } catch (error) {
+    //   console.log(error)
+    // }
 
     return res.status(200).json({
       success: true,

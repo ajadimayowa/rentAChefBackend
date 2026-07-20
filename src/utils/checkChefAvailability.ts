@@ -1,4 +1,4 @@
-import { Booking } from "../models/Booking";
+import { BookingModel } from "../models/Booking";
 
 export const isChefAvailable = async (
   chefId: string,
@@ -6,7 +6,7 @@ export const isChefAvailable = async (
   endDate: Date
 ) => {
 
-  const conflict = await Booking.findOne({
+  const conflict = await BookingModel.findOne({
     chefId,
     status: { $in: ["confirmed", "ongoing"] },
     startDate: { $lt: endDate },

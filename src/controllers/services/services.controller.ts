@@ -1,69 +1,156 @@
 import { Request, Response } from "express";
-import { Service } from "../../models/Service";
+import { ServiceModel } from "../../models/Service";
 import { Types } from "mongoose";
+import { ServiceCategoryModel } from "../../models/ServiceCategoryModel";
 
 /* ===================== SERVICE CRUD ===================== */
 
+const ALLOWED_CHEF_LEVELS = ["sous","executive","junior","senior","pro","head"] as const;
+const ALLOWED_BOOKING_TYPES = ["instant", "quotation"] as const;
+
+const isDuplicateKeyError = (error: unknown): boolean => {
+  const typedError = error as { code?: number };
+  return typedError?.code === 11000;
+};
+
+const normalizeChefLevels = (
+  allowedChefLevels: unknown
+): Array<(typeof ALLOWED_CHEF_LEVELS)[number]> | null => {
+  if (allowedChefLevels === undefined) return [];
+
+  if (!Array.isArray(allowedChefLevels)) {
+    return null;
+  }
+
+  const normalized = allowedChefLevels
+    .filter((level): level is string => typeof level === "string")
+    .map((level) => level.trim().toLowerCase())
+    .filter((level) => ALLOWED_CHEF_LEVELS.includes(level as (typeof ALLOWED_CHEF_LEVELS)[number]));
+
+  return [...new Set(normalized)] as Array<(typeof ALLOWED_CHEF_LEVELS)[number]>;
+};
+
 // CREATE SERVICE
-export const createService = async (req: Request, res: Response): Promise<any> => {
+export const createService = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { name, description, isActive } = req.body;
+    const { name, icon, categoryId, description, workflow, allowedChefLevels, bookingType, isActive } = req.body;
+    const normalizedName = typeof name === "string" ? name.trim() : "";
+    const normalizedDescription = typeof description === "string" ? description.trim() : "";
+    const normalizedIcon = typeof icon === "string" ? icon.trim() : "";
+    const normalizedWorkflow = typeof workflow === "string" ? workflow.trim() : "";
+    const normalizedBookingType =
+      typeof bookingType === "string" ? bookingType.trim().toLowerCase() : "";
+    const normalizedChefLevels = normalizeChefLevels(allowedChefLevels);
 
-    // 1️⃣ Validate input
-    if (!name || typeof name !== "string") {
-      return res.status(400).json({ success: false, message: "Service name is required" });
+    if (!normalizedName) {
+      res.status(400).json({ success: false, message: "Service name is required" });
+      return;
     }
 
-    // 2️⃣ Check for duplicate
-    const existingService = await Service.findOne({ name: name.trim() });
+    if (!categoryId || !Types.ObjectId.isValid(categoryId)) {
+      res.status(400).json({ success: false, message: "Valid categoryId is required" });
+      return;
+    }
+
+    if (!normalizedWorkflow) {
+      res.status(400).json({ success: false, message: "workflow is required" });
+      return;
+    }
+
+    if (!ALLOWED_BOOKING_TYPES.includes(normalizedBookingType as (typeof ALLOWED_BOOKING_TYPES)[number])) {
+      res
+        .status(400)
+        .json({ success: false, message: "bookingType must be either instant or quotation" });
+      return;
+    }
+
+    if (normalizedChefLevels === null) {
+      res
+        .status(400)
+        .json({ success: false, message: "allowedChefLevels must be an array of valid chef levels" });
+      return;
+    }
+
+    const categoryExists = await ServiceCategoryModel.findById(categoryId).lean();
+    if (!categoryExists) {
+      res.status(404).json({ success: false, message: "Service category not found" });
+      return;
+    }
+
+    const existingService = await ServiceModel.findOne({
+      categoryId,
+      name: { $regex: `^${normalizedName}$`, $options: "i" },
+    }).lean();
+
     if (existingService) {
-      return res.status(409).json({ success: false, message: "Service already exists" });
+      res.status(409).json({ success: false, message: "Service already exists in this category" });
+      return;
     }
 
-    // 3️⃣ Create the service
-    const service = await Service.create({
-      name: name.trim(),
-      description: description || "",
-      isActive: isActive !== undefined ? isActive : true,
+    const service = await ServiceModel.create({
+      categoryId,
+      icon: typeof normalizedIcon === "string" ? normalizedIcon : "",
+      name: normalizedName,
+      description: normalizedDescription,
+      workflow: normalizedWorkflow,
+      allowedChefLevels: normalizedChefLevels,
+      bookingType: normalizedBookingType,
+      isActive: typeof isActive === "boolean" ? isActive : true,
     });
 
-    // 4️⃣ Respond with the created service
-    return res.status(201).json({ success: true, data: service });
+    res.status(201).json({ success: true, payload: service });
+  } catch (error: unknown) {
+    if (isDuplicateKeyError(error)) {
+      res.status(409).json({ success: false, message: "Service already exists" });
+      return;
+    }
 
-  } catch (error: any) {
     console.error("Error creating service:", error);
-    return res.status(500).json({ success: false, message: "Server error" });
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
 // GET ALL SERVICES
-export const getServices = async (req: Request, res: Response): Promise<any> => {
+export const getServices = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { status, search, page = 1, limit = 20 } = req.query;
+    const { status, search, page = 1, limit = 20, categoryId, bookingType, workflow } = req.query;
 
-    // Build query object
-    const query: any = {};
+    const query: Record<string, unknown> = {};
 
-    // 1️⃣ Filter by status
     if (status === "active") query.isActive = true;
     if (status === "inactive") query.isActive = false;
 
-    // 2️⃣ Search by name (case-insensitive)
     if (search && typeof search === "string") {
-      query.name = { $regex: search, $options: "i" }; // partial match
+      query.name = { $regex: search.trim(), $options: "i" };
     }
 
-    // 3️⃣ Pagination
+    if (categoryId && Types.ObjectId.isValid(String(categoryId))) {
+      query.categoryId = categoryId;
+    }
+
+    if (
+      bookingType &&
+      typeof bookingType === "string" &&
+      ALLOWED_BOOKING_TYPES.includes(bookingType.trim().toLowerCase() as (typeof ALLOWED_BOOKING_TYPES)[number])
+    ) {
+      query.bookingType = bookingType.trim().toLowerCase();
+    }
+
+    if (workflow && typeof workflow === "string" && workflow.trim()) {
+      query.workflow = workflow.trim();
+    }
+
     const skip = (Number(page) - 1) * Number(limit);
 
-    const services = await Service.find(query)
+    const services = await ServiceModel.find(query)
+      .populate("categoryId", "name slug")
       .skip(skip)
       .limit(Number(limit))
-      .sort({ name: 1 }); // sort alphabetically by name
+      .sort({ name: 1 });
 
-    const total = await Service.countDocuments(query);
+    const total = await ServiceModel.countDocuments(query);
 
-    return res.status(200).json({
+    res.status(200).json({
       success: true,
       payload: services,
       meta: {
@@ -73,77 +160,165 @@ export const getServices = async (req: Request, res: Response): Promise<any> => 
         totalPages: Math.ceil(total / Number(limit)),
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error fetching services:", error);
-    return res.status(500).json({ success: false, message: "Server error" });
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
 // GET SINGLE SERVICE
-// GET SINGLE SERVICE
-export const getServiceById = async (req: Request, res: Response): Promise<any> => {
+export const getServiceById = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
 
-    const service = await Service.findById(id).lean();
-    if (!service) {
-      return res.status(404).json({ success: false, message: "Service not found" });
+    if (!Types.ObjectId.isValid(id)) {
+      res.status(400).json({ success: false, message: "Invalid service id" });
+      return;
     }
 
-    return res.status(200).json({ success: true, data: service });
-  } catch (error: any) {
+    const service = await ServiceModel.findById(id).populate("categoryId", "name slug").lean();
+    if (!service) {
+      res.status(404).json({ success: false, message: "Service not found" });
+      return;
+    }
+
+    res.status(200).json({ success: true, payload: service });
+  } catch (error: unknown) {
     console.error("Error fetching service:", error);
-    return res.status(500).json({ success: false, message: "Server error" });
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
 // UPDATE SERVICE
-export const updateService = async (req: Request, res: Response): Promise<any> => {
+export const updateService = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { name, description, isActive } = req.body;
+    const { name, categoryId, icon, description, workflow, allowedChefLevels, bookingType, isActive } = req.body;
 
-    const service = await Service.findById(id);
-    if (!service) {
-      return res.status(404).json({ success: false, message: "Service not found" });
+    if (!Types.ObjectId.isValid(id)) {
+      res.status(400).json({ success: false, message: "Invalid service id" });
+      return;
     }
 
-    // Update fields if provided
-    if (name) service.name = name.trim();
-    if (description !== undefined) service.description = description;
-    if (isActive !== undefined) service.isActive = isActive;
+    const service = await ServiceModel.findById(id);
+    if (!service) {
+      res.status(404).json({ success: false, message: "Service not found" });
+      return;
+    }
+
+    if (name !== undefined) {
+      const normalizedName = typeof name === "string" ? name.trim() : "";
+      if (!normalizedName) {
+        res.status(400).json({ success: false, message: "Service name cannot be empty" });
+        return;
+      }
+
+      service.name = normalizedName;
+    }
+
+    if (icon !== undefined) {
+      const normalizedIcon = typeof icon === "string" ? icon.trim() : "";
+      service.icon = normalizedIcon;
+    }
+
+    if (description !== undefined) {
+      const normalizedDescription = typeof description === "string" ? description.trim() : "";
+      service.description = normalizedDescription;
+    }
+
+    if (categoryId !== undefined) {
+      if (!Types.ObjectId.isValid(categoryId)) {
+        res.status(400).json({ success: false, message: "Invalid categoryId" });
+        return;
+      }
+
+      const categoryExists = await ServiceCategoryModel.findById(categoryId).lean();
+      if (!categoryExists) {
+        res.status(404).json({ success: false, message: "Service category not found" });
+        return;
+      }
+
+      service.categoryId = categoryId;
+    }
+
+    if (workflow !== undefined) {
+      const normalizedWorkflow = typeof workflow === "string" ? workflow.trim() : "";
+      if (!normalizedWorkflow) {
+        res.status(400).json({ success: false, message: "workflow cannot be empty" });
+        return;
+      }
+
+      service.workflow = normalizedWorkflow;
+    }
+
+    if (allowedChefLevels !== undefined) {
+      const normalizedChefLevels = normalizeChefLevels(allowedChefLevels);
+      if (normalizedChefLevels === null) {
+        res
+          .status(400)
+          .json({ success: false, message: "allowedChefLevels must be an array of valid chef levels" });
+        return;
+      }
+
+      service.allowedChefLevels = normalizedChefLevels;
+    }
+
+    if (bookingType !== undefined) {
+      const normalizedBookingType =
+        typeof bookingType === "string" ? bookingType.trim().toLowerCase() : "";
+
+      if (!ALLOWED_BOOKING_TYPES.includes(normalizedBookingType as (typeof ALLOWED_BOOKING_TYPES)[number])) {
+        res
+          .status(400)
+          .json({ success: false, message: "bookingType must be either instant or quotation" });
+        return;
+      }
+
+      service.bookingType = normalizedBookingType as "instant" | "quotation";
+    }
+
+    if (isActive !== undefined) {
+      if (typeof isActive !== "boolean") {
+        res.status(400).json({ success: false, message: "isActive must be a boolean" });
+        return;
+      }
+
+      service.isActive = isActive;
+    }
 
     await service.save();
 
-    return res.status(200).json({ success: true, data: service });
-  } catch (error: any) {
+    res.status(200).json({ success: true, payload: service });
+  } catch (error: unknown) {
+    if (isDuplicateKeyError(error)) {
+      res.status(409).json({ success: false, message: "Service already exists" });
+      return;
+    }
+
     console.error("Error updating service:", error);
-    return res.status(500).json({ success: false, message: "Server error" });
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
-export const deleteService = async (req: Request, res: Response): Promise<any> => {
+export const deleteService = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
 
-    // Option 1: find and delete
-    const service = await Service.findByIdAndDelete(id);
-
-    if (!service) {
-      return res.status(404).json({ success: false, message: "Service not found" });
+    if (!Types.ObjectId.isValid(id)) {
+      res.status(400).json({ success: false, message: "Invalid service id" });
+      return;
     }
 
-    return res.status(200).json({ success: true, message: "Service deleted successfully" });
+    const service = await ServiceModel.findByIdAndDelete(id);
 
-    // -----------------------------
-    // Option 2: soft delete (recommended)
-    // const service = await Service.findById(id);
-    // if (!service) return res.status(404).json({ success: false, message: "Service not found" });
-    // service.isActive = false;
-    // await service.save();
-    // return res.status(200).json({ success: true, message: "Service deactivated successfully" });
-  } catch (error: any) {
+    if (!service) {
+      res.status(404).json({ success: false, message: "Service not found" });
+      return;
+    }
+
+    res.status(200).json({ success: true, message: "Service deleted successfully" });
+  } catch (error: unknown) {
     console.error("Error deleting service:", error);
-    return res.status(500).json({ success: false, message: "Server error" });
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };

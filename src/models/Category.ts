@@ -8,6 +8,7 @@ export interface ICategoryService {
 export interface ICategory extends Document {
   name: string;
   description: string;
+  tasks: string[];
   slug: string;
   image?: string;
   services: ICategoryService[];
@@ -56,6 +57,10 @@ const categorySchema = new Schema<ICategory>(
     isActive: {
       type: Boolean,
       default: true,
+    },
+    tasks: {
+      type: [String],
+      default: [],
     },
   },
   {
