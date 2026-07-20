@@ -38,7 +38,7 @@ const adminLogin = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         const categories = yield Category_1.default.find()
             .select('_id name') // only fetch what you need
             .lean();
-        const services = yield Service_1.Service.find()
+        const services = yield Service_1.ServiceModel.find()
             .select('_id name') // only fetch what you need
             .lean();
         const formattedCategories = categories.map(cat => ({
@@ -160,7 +160,7 @@ const getAdminDashboard = (req, res) => __awaiter(void 0, void 0, void 0, functi
             User_model_1.default.countDocuments(),
         ]);
         // compute total revenue from confirmed bookings (sum of totalAmount)
-        const revenueAgg = yield Booking_1.Booking.aggregate([
+        const revenueAgg = yield Booking_1.BookingModel.aggregate([
             { $match: { status: 'confirmed' } },
             { $group: { _id: null, totalRevenue: { $sum: { $ifNull: ["$totalAmount", 0] } } } }
         ]);
@@ -168,7 +168,7 @@ const getAdminDashboard = (req, res) => __awaiter(void 0, void 0, void 0, functi
         // booking trends for last 6 months (including current month)
         const now = new Date();
         const start = new Date(now.getFullYear(), now.getMonth() - 5, 1, 0, 0, 0, 0);
-        const trendsAgg = yield Booking_1.Booking.aggregate([
+        const trendsAgg = yield Booking_1.BookingModel.aggregate([
             { $match: { status: 'confirmed', createdAt: { $gte: start } } },
             { $group: { _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } }, count: { $sum: 1 } } },
             { $sort: { '_id.year': 1, '_id.month': 1 } }

@@ -1,6 +1,9 @@
 import { Request, Response } from "express";
-import { Booking } from "../models/Booking"; // Path to your Booking model
+import { BookingModel } from "../models/Booking"; // Path to your Booking model
 import axios from "axios";
+import { buildChefPlatformModule } from '../platform/bootstrap';
+
+const moduleRef = buildChefPlatformModule();
 
 // Create a new booking
 export const initializePayment = async (req: Request, res: Response): Promise<any> => {
@@ -41,7 +44,15 @@ export const verifyPayment = async (req:Request, res:Response): Promise<any> => 
       }
     );
 
-    res.json(response.data);
+    const isSuccessful = response.data?.status === true && response.data?.data?.status === 'success';
+    if (isSuccessful) {
+      await moduleRef.adminBookingService.confirmPayment(reference, response.data?.data || {});
+    }
+
+    res.json({
+      ...response.data,
+      bookingPaymentSynchronized: isSuccessful,
+    });
 
   } catch (error) {
     res.status(500).json({ error: "Verification failed" });
@@ -51,7 +62,7 @@ export const verifyPayment = async (req:Request, res:Response): Promise<any> => 
 // Get all bookings
 export const getBookings = async (req: Request, res: Response) => {
   try {
-    const bookings = await Booking.find().populate("clientId chefId serviceId categoryId subCategoryId specialMenuId");
+    const bookings = await BookingModel.find().populate("clientId chefId serviceId categoryId subCategoryId specialMenuId");
     return res.status(200).json({
       success: true,
       data: bookings,
@@ -68,7 +79,7 @@ export const getBookings = async (req: Request, res: Response) => {
 // Get a single booking by ID
 export const getBookingById = async (req: Request, res: Response) => {
   try {
-    const booking = await Booking.findById(req.params.id).populate("clientId chefId serviceId categoryId subCategoryId specialMenuId");
+    const booking = await BookingModel.findById(req.params.id).populate("clientId chefId serviceId categoryId subCategoryId specialMenuId");
 
     if (!booking) {
       return res.status(404).json({
@@ -109,7 +120,7 @@ export const updateBooking = async (req: Request, res: Response) => {
       cancellationReason,
     } = req.body;
 
-    const updatedBooking = await Booking.findByIdAndUpdate(
+    const updatedBooking = await BookingModel.findByIdAndUpdate(
       req.params.id,
       {
         clientId,
@@ -153,7 +164,7 @@ export const updateBooking = async (req: Request, res: Response) => {
 // Delete a booking by ID
 export const deleteBooking = async (req: Request, res: Response) => {
   try {
-    const deletedBooking = await Booking.findByIdAndDelete(req.params.id);
+    const deletedBooking = await BookingModel.findByIdAndDelete(req.params.id);
 
     if (!deletedBooking) {
       return res.status(404).json({

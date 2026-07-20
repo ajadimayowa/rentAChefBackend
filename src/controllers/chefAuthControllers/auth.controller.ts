@@ -7,10 +7,11 @@ import jwt from 'jsonwebtoken';
 import { generateOtp } from '../../utils/otpUtils';
 import { sendEmailVerificationOtp, sendEmailVerificationSuccessEmail, sendLoginOtpEmail, sendLoginSuccessEmail, sendPasswordChangeSuccessEmail, sendUserPasswordResetOTPEmail } from '../../services/email/rentAChef/usersEmailNotifs';
 import Chef from '../../models/Chef';
+import { sendSms } from '../../services/sms/sendSms';
 
 
 export const register = async (req: Request, res: Response): Promise<any> => {
-  
+
 
   const { email, password, fullName, phoneNumber } = req.body;
 
@@ -19,25 +20,36 @@ export const register = async (req: Request, res: Response): Promise<any> => {
   }
   const formatedEmail = email.trim().toLowerCase()
   try {
-    const existing = await UserModel.findOne({ formatedEmail });
-    if (existing) {return res.status(400).json({success:false, message: 'A user with this email already exist.' });}
+    const existing = await UserModel.findOne({ email: formatedEmail });
+    if (existing) { return res.status(400).json({ success: false, message: 'A user with this email already exist.' }); }
 
     let firstName = fullName.split(' ')[0]
     const hashed = await bcrypt.hash(password, 10);
     const isAdmin = req.body.adminSecret === process.env.ADMIN_SECRET;
     const emailVerificationOtp = generateOtp()
-    const user = await UserModel.create({ email: formatedEmail, phone: phoneNumber, emailVerificationOtp, password: hashed, fullName,firstName, isAdmin });
+    const user = await UserModel.create({ email: formatedEmail, phone: phoneNumber, emailVerificationOtp, password: hashed, fullName, firstName, isAdmin });
 
     // console.log({ seeEmailVerOtp: emailVerificationOtp })
-     await  sendEmailVerificationOtp({
-          firstName,
-          email:formatedEmail,
-          emailVerificationOtp,
-      })
+    // await sendEmailVerificationOtp({
+    //   firstName,
+    //   email: formatedEmail,
+    //   emailVerificationOtp,
+    // })
+
+    console.log({ seePhone: user.phone })
+    try {
+      await sendSms({
+        to: user.phone,
+        message: `Your RentAChef verification code is ${emailVerificationOtp}`,
+      });
+    } catch (err) {
+      console.error(err);
+      // decide whether to retry, notify, or continue
+    }
     // const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'secret', { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
     return res.status(201).json({ success: true, payload: { id: user._id, email: user.email, fullName: user.fullName, isAdmin: user.isAdmin } });
 
-  } catch (error:any) {
+  } catch (error: any) {
     console.log(error)
     return res.status(500).json({
       success: false,
@@ -51,7 +63,7 @@ export const verifyEmail = async (req: Request, res: Response): Promise<any> => 
   try {
     const { email, otp } = req.body;
 
-    console.log({email:email,otp:otp})
+    console.log({ email: email, otp: otp })
 
     // Validate input
     if (!email || !otp) {
@@ -92,17 +104,17 @@ export const verifyEmail = async (req: Request, res: Response): Promise<any> => 
     customer.emailVerificationOtp = "";
     await customer.save();
     let firstName = customer?.firstName
-    await  sendEmailVerificationSuccessEmail({
-          firstName,
-          email,
-      })
+    await sendEmailVerificationSuccessEmail({
+      firstName,
+      email,
+    })
 
     return res.status(200).json({
       success: true,
       message: "Email verified successfully.",
     });
 
-    
+
   } catch (error: any) {
     console.error("Error verifying email:", error);
     return res.status(500).json({
@@ -160,22 +172,33 @@ export const login = async (req: Request, res: Response): Promise<any> => {
     user.loginOtpExpires = otpExpires;
     await user.save();
 
-    console.log({seeOtp:otp})
+    console.log({ seeOtp: otp })
     // Send OTP via email
+    // try {
+    //   await sendLoginOtpEmail({
+    //     firstName: user.firstName,
+    //     email: user.email,
+    //     loginOtp: otp,
+    //   });
+    // } catch (error) {
+    //   console.error("Error sending OTP email:", error);
+    //   // Don't block login flow if email fails, just log it
+    // }
+
+    console.log({ seePhone: user.phone })
     try {
-      await sendLoginOtpEmail({
-        firstName: user.firstName,
-        email: user.email,
-        loginOtp: otp,
+      await sendSms({
+        to: user.phone,
+        message: `Your RentAChef login OTP code is ${otp}`,
       });
-    } catch (error) {
-      console.error("Error sending OTP email:", error);
-      // Don't block login flow if email fails, just log it
+    } catch (err) {
+      console.error(err);
+      // decide whether to retry, notify, or continue
     }
 
     return res.status(200).json({
       success: true,
-      message: "OTP sent to email.",
+      message: "OTP sent to phone.",
       payload: {
         email: user.email,
         expiresAt: otpExpires,
@@ -253,15 +276,15 @@ export const verifyLoginOtp = async (req: Request, res: Response): Promise<any> 
     );
 
     // Send OTP via email
-    
-    try {
-        await sendLoginSuccessEmail({
-        firstName: customer.firstName,
-        email: customer.email,
-      });
-    } catch (error) {
-      console.log(error)
-    }
+
+    // try {
+    //   await sendLoginSuccessEmail({
+    //     firstName: customer.firstName,
+    //     email: customer.email,
+    //   });
+    // } catch (error) {
+    //   console.log(error)
+    // }
 
     return res.status(200).json({
       success: true,
@@ -289,7 +312,7 @@ export const verifyLoginOtp = async (req: Request, res: Response): Promise<any> 
 /**
  * REQUEST PASSWORD CHANGE OTP
  */
-export const requestPasswordChangeOtp = async (req: Request, res: Response) : Promise<any> => {
+export const requestPasswordChangeOtp = async (req: Request, res: Response): Promise<any> => {
   try {
     const { email } = req.body;
 
@@ -311,20 +334,32 @@ export const requestPasswordChangeOtp = async (req: Request, res: Response) : Pr
     // );
 
     // Send OTP via email
+    // try {
+    //   await sendUserPasswordResetOTPEmail({
+    //     firstName: user.firstName,
+    //     email: user.email,
+    //     loginOtp: otp,
+    //   });
+    // } catch (error) {
+    //   console.error("Error sending OTP email:", error);
+    //   // Don't block login flow if email fails, just log it
+    // }
+
+
+     console.log({ seePhone: user.phone })
     try {
-      await sendUserPasswordResetOTPEmail({
-        firstName: user.firstName,
-        email: user.email,
-        loginOtp: otp,
+      await sendSms({
+        to: user.phone,
+        message: `Your RentAChef Password reset code is ${otp}`,
       });
-    } catch (error) {
-      console.error("Error sending OTP email:", error);
-      // Don't block login flow if email fails, just log it
+    } catch (err) {
+      console.error(err);
+      // decide whether to retry, notify, or continue
     }
 
     return res.status(200).json({
-      success:true,
-      message: 'Password reset OTP sent to email',
+      success: true,
+      message: 'Password reset code sent to phone',
     });
   } catch (error) {
     return res.status(500).json({ message: 'Server error' });
@@ -339,7 +374,7 @@ export const requestPasswordChangeOtp = async (req: Request, res: Response) : Pr
 /**
  * CHANGE PASSWORD WITH OTP
  */
-export const changePasswordWithOtp = async (req: Request, res: Response) : Promise<any> => {
+export const changePasswordWithOtp = async (req: Request, res: Response): Promise<any> => {
   try {
     const { email, otp, newPassword } = req.body;
 
@@ -365,17 +400,17 @@ export const changePasswordWithOtp = async (req: Request, res: Response) : Promi
 
     await user.save();
 
-    try {
-        await sendPasswordChangeSuccessEmail({
-        firstName: user.firstName,
-        email: user.email,
-      });
-    } catch (error) {
-      console.log(error)
-    }
+    // try {
+    //   await sendPasswordChangeSuccessEmail({
+    //     firstName: user.firstName,
+    //     email: user.email,
+    //   });
+    // } catch (error) {
+    //   console.log(error)
+    // }
 
     return res.status(200).json({
-      success:true,
+      success: true,
       message: 'Password changed successfully',
     });
   } catch (error) {
@@ -387,7 +422,7 @@ export const changePasswordWithOtp = async (req: Request, res: Response) : Promi
 /**
  * RESEND PASSWORD CHANGE OTP
  */
-export const resendPasswordChangeOtp = async (req: Request, res: Response):Promise<any> => {
+export const resendPasswordChangeOtp = async (req: Request, res: Response): Promise<any> => {
   try {
     const { email } = req.body;
 
@@ -402,8 +437,8 @@ export const resendPasswordChangeOtp = async (req: Request, res: Response):Promi
     user.loginOtpExpires = new Date(Date.now() + 10 * 60 * 1000);
     await user.save();
 
-     try {
-        await sendPasswordChangeSuccessEmail({
+    try {
+      await sendPasswordChangeSuccessEmail({
         firstName: user.firstName,
         email: user.email,
       });

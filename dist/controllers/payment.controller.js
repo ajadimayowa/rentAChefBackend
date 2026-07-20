@@ -15,6 +15,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteBooking = exports.updateBooking = exports.getBookingById = exports.getBookings = exports.verifyPayment = exports.initializePayment = void 0;
 const Booking_1 = require("../models/Booking"); // Path to your Booking model
 const axios_1 = __importDefault(require("axios"));
+const bootstrap_1 = require("../platform/bootstrap");
+const moduleRef = (0, bootstrap_1.buildChefPlatformModule)();
 // Create a new booking
 const initializePayment = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
@@ -38,6 +40,7 @@ const initializePayment = (req, res) => __awaiter(void 0, void 0, void 0, functi
 });
 exports.initializePayment = initializePayment;
 const verifyPayment = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c, _d;
     const { reference } = req.params;
     try {
         const response = yield axios_1.default.get(`https://api.paystack.co/transaction/verify/${reference}`, {
@@ -45,7 +48,11 @@ const verifyPayment = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                 Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`
             }
         });
-        res.json(response.data);
+        const isSuccessful = ((_a = response.data) === null || _a === void 0 ? void 0 : _a.status) === true && ((_c = (_b = response.data) === null || _b === void 0 ? void 0 : _b.data) === null || _c === void 0 ? void 0 : _c.status) === 'success';
+        if (isSuccessful) {
+            yield moduleRef.adminBookingService.confirmPayment(reference, ((_d = response.data) === null || _d === void 0 ? void 0 : _d.data) || {});
+        }
+        res.json(Object.assign(Object.assign({}, response.data), { bookingPaymentSynchronized: isSuccessful }));
     }
     catch (error) {
         res.status(500).json({ error: "Verification failed" });
@@ -55,7 +62,7 @@ exports.verifyPayment = verifyPayment;
 // Get all bookings
 const getBookings = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const bookings = yield Booking_1.Booking.find().populate("clientId chefId serviceId categoryId subCategoryId specialMenuId");
+        const bookings = yield Booking_1.BookingModel.find().populate("clientId chefId serviceId categoryId subCategoryId specialMenuId");
         return res.status(200).json({
             success: true,
             data: bookings,
@@ -73,7 +80,7 @@ exports.getBookings = getBookings;
 // Get a single booking by ID
 const getBookingById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const booking = yield Booking_1.Booking.findById(req.params.id).populate("clientId chefId serviceId categoryId subCategoryId specialMenuId");
+        const booking = yield Booking_1.BookingModel.findById(req.params.id).populate("clientId chefId serviceId categoryId subCategoryId specialMenuId");
         if (!booking) {
             return res.status(404).json({
                 success: false,
@@ -98,7 +105,7 @@ exports.getBookingById = getBookingById;
 const updateBooking = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { clientId, chefId, serviceId, categoryId, subCategoryId, specialMenuId, dates, bookingFeePaid, bookingFeeAmount, totalAmount, procurementId, status, cancellationReason, } = req.body;
-        const updatedBooking = yield Booking_1.Booking.findByIdAndUpdate(req.params.id, {
+        const updatedBooking = yield Booking_1.BookingModel.findByIdAndUpdate(req.params.id, {
             clientId,
             chefId,
             serviceId,
@@ -137,7 +144,7 @@ exports.updateBooking = updateBooking;
 // Delete a booking by ID
 const deleteBooking = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const deletedBooking = yield Booking_1.Booking.findByIdAndDelete(req.params.id);
+        const deletedBooking = yield Booking_1.BookingModel.findByIdAndDelete(req.params.id);
         if (!deletedBooking) {
             return res.status(404).json({
                 success: false,

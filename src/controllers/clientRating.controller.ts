@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { ClientRating } from '../models/ClientRating';
-import { Booking } from '../models/Booking';
+import { BookingModel } from '../models/Booking';
 import UserModel from '../models/User.model';
 
 export const addOrUpdateClientRating = async (req: Request, res: Response): Promise<any> => {
@@ -13,7 +13,7 @@ export const addOrUpdateClientRating = async (req: Request, res: Response): Prom
 
     if (!bookingId) return res.status(400).json({ success: false, message: 'bookingId is required' });
 
-    const booking = await Booking.findById(bookingId);
+    const booking = await BookingModel.findById(bookingId);
     if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
 
     // Ensure actor is the chef for this booking (if actor is Chef)
@@ -22,7 +22,7 @@ export const addOrUpdateClientRating = async (req: Request, res: Response): Prom
       return res.status(403).json({ success: false, message: 'You can only rate clients for your bookings' });
     }
 
-    if (booking.status !== 'completed') {
+    if (booking.status !== 'Completed') {
       return res.status(400).json({ success: false, message: 'Booking must be completed to submit a rating' });
     }
 
@@ -30,7 +30,7 @@ export const addOrUpdateClientRating = async (req: Request, res: Response): Prom
       return res.status(400).json({ success: false, message: 'Rating must be between 1 and 5' });
     }
 
-    const clientId = booking.clientId;
+    const clientId = booking.customerId.toString();
 
     const r = await ClientRating.findOneAndUpdate(
       { bookingId },

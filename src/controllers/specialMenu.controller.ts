@@ -14,19 +14,20 @@ export const createSpecialMenu = async (req: Request, res: Response):Promise<any
         } = req.body;
 
         /** Basic validation */
-        if (!title || !price) {
+        if (!title || !minimumGuests || !numberOfDishes || !price) {
             return res.status(400).json({
-                message: "Title and price are required",
+                success: false,
+                message: "title, minimumGuests, numberOfDishes and price are required",
             });
         }
 
         const specialMenu = await SpecialMenu.create({
             title,
             description,
-            minimumGuests,
-            numberOfDishes,
+            minimumGuests: Number(minimumGuests),
+            numberOfDishes: Number(numberOfDishes),
             image: menuPic?.location || menuPic?.path || "", // depending on S3 or local
-            price,
+            price: Number(price),
         });
 
         res.status(201).json({
@@ -54,12 +55,50 @@ export const createSpecialMenu = async (req: Request, res: Response):Promise<any
 };
 
 /** GET ALL */
-export const getAllSpecialMenus = async (_: Request, res: Response) => {
+export const getAllSpecialMenus = async (req: Request, res: Response) => {
     try {
-        const menus = await SpecialMenu.find().sort({ createdAt: -1 });
-        res.status(200).json({success:true,payload:menus});
+        const parsedPage = Number(req.query.page);
+        const parsedLimit = Number(req.query.limit);
+
+        const page = Number.isFinite(parsedPage) && parsedPage > 0 ? Math.floor(parsedPage) : 1;
+        const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.floor(parsedLimit) : 10;
+
+        const rawSearch = req.query.name ?? req.query.search ?? req.query.q;
+        const search = typeof rawSearch === "string" ? rawSearch.trim() : "";
+
+        const filter: Record<string, any> = {};
+        if (search) {
+            filter.$or = [
+                { title: { $regex: search, $options: "i" } },
+                { description: { $regex: search, $options: "i" } },
+            ];
+        }
+
+        const skip = (page - 1) * limit;
+
+        const [menus, total] = await Promise.all([
+            SpecialMenu.find(filter)
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit),
+            SpecialMenu.countDocuments(filter),
+        ]);
+
+        const totalPages = total > 0 ? Math.ceil(total / limit) : 0;
+
+        res.status(200).json({
+            success: true,
+            data: menus,
+            payload: menus,
+            meta: {
+                total,
+                limit,
+                page,
+                totalPages,
+            },
+        });
     } catch (error: any) {
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ success:false, message: error.message });
     }
 };
 
@@ -68,28 +107,45 @@ export const getSpecialMenuById = async (req: Request, res: Response):Promise<an
     try {
         const menu = await SpecialMenu.findById(req.params.id);
         if (!menu) {
-            return res.status(404).json({ message: "Special menu not found" });
+            return res.status(404).json({ success:false, message: "Special menu not found" });
         }
-        res.status(200).json({success:true,payload:menu});
+        res.status(200).json({success:true,data:menu});
     } catch (error: any) {
-        res.status(400).json({ message: error.message });
+        res.status(400).json({ success:false, message: error.message });
     }
 };
 
 /** UPDATE */
 export const updateSpecialMenu = async (req: Request, res: Response):Promise<any> => {
     try {
+        const menuPic = req.file as any;
+        const updatePayload: any = { ...req.body };
+
+        if (menuPic?.location || menuPic?.path) {
+            updatePayload.image = menuPic?.location || menuPic?.path;
+        }
+
+        if (Object.prototype.hasOwnProperty.call(updatePayload, "minimumGuests")) {
+            updatePayload.minimumGuests = Number(updatePayload.minimumGuests);
+        }
+        if (Object.prototype.hasOwnProperty.call(updatePayload, "numberOfDishes")) {
+            updatePayload.numberOfDishes = Number(updatePayload.numberOfDishes);
+        }
+        if (Object.prototype.hasOwnProperty.call(updatePayload, "price")) {
+            updatePayload.price = Number(updatePayload.price);
+        }
+
         const menu = await SpecialMenu.findByIdAndUpdate(
             req.params.id,
-            req.body,
+            updatePayload,
             { new: true, runValidators: true }
         );
 
         if (!menu) {
-            return res.status(404).json({ message: "Special menu not found" });
+            return res.status(404).json({ success:false, message: "Special menu not found" });
         }
 
-        res.status(200).json({success:true,payload:menu});
+        res.status(200).json({success:true,data:menu});
     } catch (error: any) {
         res.status(400).json({success:false, message: error.message });
     }
@@ -106,7 +162,7 @@ export const deleteSpecialMenu = async (req: Request, res: Response):Promise<any
 
         res.status(200).json({success:true, message: "Special menu deleted successfully" });
     } catch (error: any) {
-        res.status(400).json({ message: error.message });
+        res.status(400).json({ success:false, message: error.message });
     }
 };
 
@@ -118,13 +174,13 @@ export const addProcurements = async (req: Request, res: Response):Promise<any> 
         : req.body.procurements;
 
     const menu = await SpecialMenu.findByIdAndUpdate(
-      req.params.id,
+            req.params.menuId,
       { $push: { procurements: { $each: procurements } } },
       { new: true, runValidators: true }
     );
 
     if (!menu) {
-      return res.status(404).json({ message: "Special menu not found" });
+            return res.status(404).json({ success:false, message: "Special menu not found" });
     }
 
     res.status(200).json({
@@ -133,6 +189,7 @@ export const addProcurements = async (req: Request, res: Response):Promise<any> 
     });
   } catch (error: any) {
     res.status(400).json({
+            success: false,
       message: "Failed to add procurements",
       error: error.message,
     });

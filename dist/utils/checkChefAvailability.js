@@ -12,7 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.isChefAvailable = void 0;
 const Booking_1 = require("../models/Booking");
 const isChefAvailable = (chefId, startDate, endDate) => __awaiter(void 0, void 0, void 0, function* () {
-    const conflict = yield Booking_1.Booking.findOne({
+    const conflict = yield Booking_1.BookingModel.findOne({
         chefId,
         status: { $in: ["confirmed", "ongoing"] },
         startDate: { $lt: endDate },

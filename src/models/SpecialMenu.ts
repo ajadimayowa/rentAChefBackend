@@ -14,7 +14,7 @@ export interface ISpecialMenu extends Document {
   minimumGuests:number;
   numberOfDishes:number;
   image?: string;
-  procurements?: IProcurement[];
+  procurements?:Types.ObjectId[];
   price: number;
   createdAt: Date;
   updatedAt: Date;

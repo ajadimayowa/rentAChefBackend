@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { ChefRating } from '../models/ChefRating';
 import Chef from '../models/Chef';
-import { Booking } from '../models/Booking';
+import { BookingModel } from '../models/Booking';
 
 export const addOrUpdateChefRating = async (req: Request, res: Response): Promise<any> => {
   try {
@@ -17,21 +17,21 @@ export const addOrUpdateChefRating = async (req: Request, res: Response): Promis
     if (!bookingId) return res.status(400).json({ success: false, message: 'bookingId is required' });
 
     // validate booking
-    const booking = await Booking.findById(bookingId);
+    const booking = await BookingModel.findById(bookingId);
     if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
 
     // only the booking client can rate
-    if (booking.clientId.toString() !== user.id) {
+    if (booking.customerId.toString() !== user.id) {
       return res.status(403).json({ success: false, message: 'You can only rate your own bookings' });
     }
 
-    // booking must be for this chef and of type 'chef'
-    if (booking.bookingType !== 'chef' || (booking.chefId && booking.chefId.toString() !== chefId)) {
+    // booking must be for this chef
+    if (!booking.chefId || booking.chefId.toString() !== chefId) {
       return res.status(400).json({ success: false, message: 'Booking does not belong to this chef' });
     }
 
     // require completed bookings for rating
-    if (booking.status !== 'completed') {
+    if (booking.status !== 'Completed') {
       return res.status(400).json({ success: false, message: 'Booking must be completed to submit a rating' });
     }
 

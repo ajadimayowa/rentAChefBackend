@@ -2,35 +2,42 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import UserModel from '../models/User.model';
 
-// export const verifyToken = async (req: Request, res: Response, next: NextFunction) => {
-//   const authHeader = req.headers.authorization;
-//   if (!authHeader) return res.status(401).json({ msg: 'No token' });
+const getTokenFromRequest = (req: Request): string | null => {
+  const authHeader = req.headers.authorization;
+  const xAccessToken = req.headers['x-access-token'];
+  const raw = authHeader || (Array.isArray(xAccessToken) ? xAccessToken[0] : xAccessToken);
 
-//   try {
-//     const token = authHeader.split(' ')[1];
-//     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
+  if (!raw || typeof raw !== 'string') return null;
 
-//     const user = await User.findById(decoded.id);
-//     if (!user) return res.status(403).json({ msg: 'Invalid token' });
-//     (req as any).user = user;
-//     next();
-//   } catch (err) {
-//     res.status(401).json({ msg: 'Token failed' });
-//   }
-// };
+  // Accept both "Bearer <token>" and raw token values.
+  if (raw.toLowerCase().startsWith('bearer ')) {
+    return raw.slice(7).trim();
+  }
+
+  return raw.trim();
+};
+
+const getDecodedUserId = (decoded: any): string | undefined => {
+  return decoded?.id || decoded?._id || decoded?.userId || decoded?.sub;
+};
 
 export const verifyToken = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) {
+  const token = getTokenFromRequest(req);
+  if (!token) {
     res.status(401).json({ msg: 'No token provided' });
     return;
   }
 
   try {
-    const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
+    const userId = getDecodedUserId(decoded);
 
-    const user = await UserModel.findById(decoded.id);
+    if (!userId) {
+      res.status(401).json({ msg: 'Token payload missing user id' });
+      return;
+    }
+
+    const user = await UserModel.findById(userId);
     if (!user) {
       res.status(403).json({ msg: 'Invalid token' });
       return;
@@ -39,8 +46,12 @@ export const verifyToken = async (req: Request, res: Response, next: NextFunctio
     (req as any).user = user;
     next(); // ✅ move on to controller
   } catch (err) {
-    res.status(401).json({ msg: 'Token failed' });
-  }
+  console.error(err);
+  res.status(401).json({
+    msg: 'Token failed',
+    error: err instanceof Error ? err.message : err,
+  });
+}
 };
 
 // export const verifyRootAdminToken = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -69,17 +80,24 @@ export const verifyToken = async (req: Request, res: Response, next: NextFunctio
 
 
 export const verifyUserToken = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) {
+  const token = getTokenFromRequest(req);
+
+  if (!token) {
     res.status(401).json({ msg: 'No token provided' });
     return;
   }
 
   try {
-    const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
+    const userId = getDecodedUserId(decoded);
 
-    const user = await UserModel.findById(decoded.id);
+    if (!userId) {
+      res.status(401).json({ msg: 'Token payload missing user id' });
+      return;
+    }
+
+    const user = await UserModel.findById(userId);
+    
     if (!user) {
       res.status(403).json({ msg: 'Invalid token' });
       return;
@@ -88,8 +106,12 @@ export const verifyUserToken = async (req: Request, res: Response, next: NextFun
     (req as any).user = user;
     next(); // ✅ move on to controller
   } catch (err) {
-    res.status(401).json({ msg: 'Token failed' });
-  }
+  console.error(err);
+  res.status(401).json({
+    msg: 'Token failed',
+    error: err instanceof Error ? err.message : err,
+  });
+}
 };
 
 export const isSuperAdmin = (req: Request, res: Response, next: NextFunction) => {

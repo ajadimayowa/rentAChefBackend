@@ -1,110 +1,118 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Booking = void 0;
-const mongoose_1 = require("mongoose");
+exports.BookingModel = void 0;
+const mongoose_1 = __importStar(require("mongoose"));
+const MenuSelectionSchema = new mongoose_1.Schema({
+    source: { type: String, enum: ["chef", "customer"] },
+    chefMenuId: { type: mongoose_1.Schema.Types.ObjectId, ref: "ChefMenu" },
+    uploadedMenuUrl: String,
+    uploadedMenuType: String,
+});
+const ProcurementSchema = new mongoose_1.Schema({
+    option: { type: String, enum: ["customer", "chef"] },
+    estimatedCost: Number,
+    finalCost: Number,
+    procurementFee: Number,
+});
 const BookingSchema = new mongoose_1.Schema({
-    clientId: {
-        type: mongoose_1.Schema.Types.ObjectId,
-        ref: "User",
-        required: true,
-    },
-    bookingType: {
-        type: String,
-        enum: ["special-menu", "chef"],
-        required: true,
-    },
-    clientNote: {
-        type: String,
-        required: true,
-    },
-    chefId: {
-        type: mongoose_1.Schema.Types.ObjectId,
-        ref: "Chef",
-        required: function () {
-            return this.bookingType === "chef";
-        },
-    },
+    bookingNumber: { type: String, required: true, unique: true, index: true },
+    customerId: { type: mongoose_1.Schema.Types.ObjectId, ref: "User", index: true },
+    chefId: { type: mongoose_1.Schema.Types.ObjectId, ref: "Chef", index: true },
+    specialServiceId: { type: mongoose_1.Schema.Types.ObjectId, ref: "SpecialMenu", index: true },
     serviceId: {
         type: mongoose_1.Schema.Types.ObjectId,
         ref: "Service",
-        required: function () {
-            return this.bookingType === "chef";
-        },
+        index: true,
     },
-    categoryId: {
-        type: mongoose_1.Schema.Types.ObjectId,
+    chefCategory: {
+        type: String,
         ref: "Category",
+        index: true,
     },
-    subCategoryId: {
-        type: mongoose_1.Schema.Types.ObjectId,
-        ref: "SubCategory",
-    },
-    specialMenuId: {
-        type: mongoose_1.Schema.Types.ObjectId,
-        ref: "SpecialMenu",
-        required: function () {
-            return this.bookingType === "special-menu";
-        },
-    },
-    startDate: {
-        type: Date,
-        required: true,
-    },
-    endDate: {
-        type: Date,
-        required: true,
-        validate: {
-            validator: function (v) {
-                return v > this.startDate;
-            },
-            message: "End date must be after the start date.",
-        },
-    },
-    bookingFeePaid: {
-        type: Boolean,
-        default: true,
-    },
-    bookingFeeAmount: {
-        type: Number,
-        min: 0,
-        default: 0,
-        required: true,
-    },
-    numberOfPeople: {
-        type: Number,
-        min: 1,
-        default: 1,
-        required: true,
-    },
-    procurementId: {
-        type: mongoose_1.Schema.Types.ObjectId,
-        ref: 'Procurement',
-    },
-    totalAmount: {
-        type: Number,
-        required: true,
-        min: 0,
-    },
-    paymentChannel: {
+    workflow: { type: String, index: true },
+    bookingType: {
         type: String,
-        enum: ["paystack", "invoice"],
+        enum: ["instant", "quotation"],
     },
-    paymentReference: {
+    modeOfPayment: {
         type: String,
-        trim: true,
-        unique: true,
-        sparse: true,
+        enum: ['Paystack', 'Transfer', 'Unpaid'],
+        index: true,
     },
     status: {
         type: String,
-        enum: ["pending", "confirmed", "ongoing", "completed", "cancelled"],
-        default: "confirmed",
+        enum: [
+            "Submitted",
+            "Admin reviewed",
+            "Quotation sent",
+            "Chef assigned",
+            "In progress",
+            "Completed",
+            "Cancelled",
+        ],
+        index: true,
+        default: "Submitted",
+    },
+    paymentStatus: {
+        type: String,
+        enum: ["Unpaid", "Paid", "Failed"],
+        default: "Unpaid",
         index: true,
     },
-    cancellationReason: {
-        type: String,
-        trim: true,
+    bookingData: mongoose_1.Schema.Types.Mixed,
+    pricingSnapshot: {
+        baseChefFeeMinor: { type: Number, default: 0 },
+        estimatedTotalMinor: { type: Number, default: 0 },
+        currency: { type: String, default: 'NGN' },
     },
+    timeline: [
+        {
+            status: { type: String, required: true },
+            changedBy: { type: String, required: true },
+            changedAt: { type: Date, required: true },
+            reason: { type: String },
+        },
+    ],
+    menuSelection: MenuSelectionSchema,
+    menuSelectionType: { type: String, enum: ['CHEF_MENU', 'CUSTOMER_UPLOAD'] },
+    chefMenuId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'ChefMenu' },
+    customerUploadedMenuFileId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'UploadedFile' },
+    procurement: ProcurementSchema,
+    quotationId: { type: mongoose_1.Schema.Types.ObjectId, ref: "Quotation" },
+    transactnRef: { type: String, required: true, index: true, default: "" },
 }, {
     timestamps: true,
     toJSON: {
@@ -117,24 +125,7 @@ const BookingSchema = new mongoose_1.Schema({
         },
     },
 });
-/* Fast chef availability lookup */
-BookingSchema.index({
-    chefId: 1,
-    startDate: 1,
-    endDate: 1,
-    status: 1,
-});
-/* Client booking history */
-BookingSchema.index({
-    clientId: 1,
-    createdAt: -1,
-});
-/* Prevent duplicate booking for same chef + time slot */
-BookingSchema.index({ chefId: 1, startDate: 1, endDate: 1 }, {
-    unique: true,
-    partialFilterExpression: {
-        chefId: { $exists: true },
-        status: { $in: ["confirmed", "ongoing"] }
-    }
-});
-exports.Booking = (0, mongoose_1.model)("Booking", BookingSchema);
+BookingSchema.index({ customerId: 1, createdAt: -1 });
+BookingSchema.index({ status: 1, paymentStatus: 1, createdAt: -1 });
+BookingSchema.index({ serviceId: 1, chefLevel: 1, status: 1 });
+exports.BookingModel = mongoose_1.default.model("Booking", BookingSchema);

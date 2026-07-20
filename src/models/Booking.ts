@@ -1,159 +1,170 @@
-import { Schema, model, Types, Document } from "mongoose";
+import mongoose, { Schema, Document, Model } from "mongoose";
 
 export interface IBooking extends Document {
-  clientId: Types.ObjectId;
-  chefId?: Types.ObjectId;
-  serviceId?: Types.ObjectId;
-  categoryId?: Types.ObjectId;
-  subCategoryId?: Types.ObjectId;
-  specialMenuId?: Types.ObjectId;
+  bookingNumber: string;
+  customerId: Schema.Types.ObjectId;
+  specialServiceId?: Schema.Types.ObjectId;
+  serviceId?: Schema.Types.ObjectId;
+  termsAccepted: boolean;
 
-  clientNote:string,
+  chefId?: Schema.Types.ObjectId;
+  chefCategory?: Schema.Types.ObjectId;
 
-  startDate: Date;
-  endDate: Date;
+  workflow?: string;
 
-  bookingFeePaid: boolean;
-  bookingFeeAmount: number;
-  numberOfPeople: number;
-  totalAmount: number;
-  procurementId?: Types.ObjectId;
+  bookingType?: 'INSTANT' | 'QUOTATION';
+  modeOfPayment?: 'Paystack' | 'Transfer' | 'Unpaid';
 
-  bookingType: "special-menu" | "chef";
+  status: BookingStatus;
+  paymentStatus: PaymentStatus;
+  startDate?: Date;
+  endDate?: Date;
 
-  status: "pending" | "confirmed" | "ongoing" | "completed" | "cancelled";
+  bookingData: Record<string, any>;
+  pricingSnapshot?: {
+    baseChefFeeMinor: number;
+    estimatedTotalMinor: number;
+    currency: string;
+  };
+  timeline?: Array<{
+    status: string;
+    changedBy: string;
+    changedAt: Date;
+    reason?: string;
+  }>;
 
-  paymentChannel?: "paystack" | "invoice";
-  paymentReference?: string;
+  menuSelection?: IMenuSelection;
+  menuSelectionType?: 'CHEF_MENU' | 'CUSTOMER_UPLOAD';
+  chefMenuId?: Schema.Types.ObjectId;
+  customerUploadedMenuFileId?: Schema.Types.ObjectId;
 
-  cancellationReason?: string;
+  procurement?: IProcurement;
 
-  createdAt?: Date;
-  updatedAt?: Date;
+  quotationId?: string;
+  transactnRef?: string;
 }
+
+export type BookingStatus =
+  | "Submitted"
+  | "Admin review"
+  | "Quotation sent"
+  | "Chef assigned"
+  | "In progress"
+  | "Completed"
+  | "Cancelled"
+
+export type PaymentStatus =
+  | "Unpaid"
+  | "Paid"
+  | "Failed"
+
+export interface IMenuSelection {
+  source: "chef" | "customer";
+  chefMenuId?: string;
+  uploadedMenuUrl?: string;
+  uploadedMenuType?: "pdf" | "docx" | "jpg" | "png";
+}
+
+export interface IProcurement {
+  option: "customer" | "chef";
+  estimatedCost?: number;
+  finalCost?: number;
+  procurementFee?: number;
+}
+
+const MenuSelectionSchema = new Schema<IMenuSelection>({
+  source: { type: String, enum: ["chef", "customer"] },
+  chefMenuId: { type: Schema.Types.ObjectId, ref: "ChefMenu" },
+  uploadedMenuUrl: String,
+  uploadedMenuType: String,
+});
+
+const ProcurementSchema = new Schema<IProcurement>({
+  option: { type: String, enum: ["customer", "chef"] },
+  estimatedCost: Number,
+  finalCost: Number,
+  procurementFee: Number,
+});
 
 const BookingSchema = new Schema<IBooking>(
   {
-    clientId: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
-
-    bookingType: {
-      type: String,
-      enum: ["special-menu", "chef"],
-      required: true,
-    },
-
-    clientNote: {
-      type: String,
-      required: true,
-    },
-
-    chefId: {
-      type: Schema.Types.ObjectId,
-      ref: "Chef",
-      required: function () {
-        return this.bookingType === "chef";
-      },
-    },
-
+    bookingNumber: { type: String, required: true, unique: true, index: true },
+    customerId: { type: Schema.Types.ObjectId, ref: "User", index: true },
+    chefId: { type: Schema.Types.ObjectId, ref: "Chef", index: true },
+    specialServiceId: { type: Schema.Types.ObjectId, ref: "SpecialMenu", index: true },
     serviceId: {
       type: Schema.Types.ObjectId,
       ref: "Service",
-      required: function () {
-        return this.bookingType === "chef";
-      },
+      index: true,
     },
 
-    categoryId: {
-      type: Schema.Types.ObjectId,
+    chefCategory: {
+      type: String,
       ref: "Category",
+      index: true,
     },
+    workflow: { type: String, index: true },
 
-    subCategoryId: {
-      type: Schema.Types.ObjectId,
-      ref: "SubCategory",
-    },
-
-    specialMenuId: {
-      type: Schema.Types.ObjectId,
-      ref: "SpecialMenu",
-      required: function () {
-        return this.bookingType === "special-menu";
-      },
-    },
-
-    startDate: {
-      type: Date,
-      required: true,
-    },
-
-    endDate: {
-      type: Date,
-      required: true,
-      validate: {
-        validator: function (v: Date) {
-          return v > this.startDate;
-        },
-        message: "End date must be after the start date.",
-      },
-    },
-
-    bookingFeePaid: {
-      type: Boolean,
-      default: true,
-    },
-
-    bookingFeeAmount: {
-      type: Number,
-      min: 0,
-      default: 0,
-      required: true,
-    },
-
-    numberOfPeople: {
-      type: Number,
-      min: 1,
-      default: 1,
-      required: true,
-    },
-
-    procurementId: {
-      type: Schema.Types.ObjectId,
-      ref: 'Procurement',
-    },
-
-    totalAmount: {
-      type: Number,
-      required: true,
-      min: 0,
-    },
-
-    paymentChannel: {
+    bookingType: {
       type: String,
-      enum: ["paystack", "invoice"],
+      enum: ["instant", "quotation"],
     },
 
-    paymentReference: {
+    modeOfPayment: {
       type: String,
-      trim: true,
-      unique: true,
-      sparse: true,
+      enum: ['Paystack', 'Transfer', 'Unpaid'],
+      index: true,
     },
 
     status: {
       type: String,
-      enum: ["pending", "confirmed", "ongoing", "completed", "cancelled"],
-      default: "confirmed",
+      enum: [
+        "Submitted",
+        "Admin reviewed",
+        "Quotation sent",
+        "Chef assigned",
+        "In progress",
+        "Completed",
+        "Cancelled",
+      ],
+      index: true,
+      default: "Submitted",
+    },
+
+    paymentStatus: {
+      type: String,
+      enum: ["Unpaid", "Paid", "Failed"],
+      default: "Unpaid",
       index: true,
     },
 
-    cancellationReason: {
-      type: String,
-      trim: true,
+    bookingData: Schema.Types.Mixed,
+
+    pricingSnapshot: {
+      baseChefFeeMinor: { type: Number, default: 0 },
+      estimatedTotalMinor: { type: Number, default: 0 },
+      currency: { type: String, default: 'NGN' },
     },
+
+    timeline: [
+      {
+        status: { type: String, required: true },
+        changedBy: { type: String, required: true },
+        changedAt: { type: Date, required: true },
+        reason: { type: String },
+      },
+    ],
+
+    menuSelection: MenuSelectionSchema,
+    menuSelectionType: { type: String, enum: ['CHEF_MENU', 'CUSTOMER_UPLOAD'] },
+    chefMenuId: { type: Schema.Types.ObjectId, ref: 'ChefMenu' },
+    customerUploadedMenuFileId: { type: Schema.Types.ObjectId, ref: 'UploadedFile' },
+
+    procurement: ProcurementSchema,
+
+    quotationId: { type: Schema.Types.ObjectId, ref: "Quotation" },
+
+    transactnRef: { type: String, required: true, index: true, default: "" },
   },
   {
     timestamps: true,
@@ -169,32 +180,9 @@ const BookingSchema = new Schema<IBooking>(
   }
 );
 
-/* Fast chef availability lookup */
-BookingSchema.index({
-  chefId: 1,
-  startDate: 1,
-  endDate: 1,
-  status: 1,
-});
+BookingSchema.index({ customerId: 1, createdAt: -1 });
+BookingSchema.index({ status: 1, paymentStatus: 1, createdAt: -1 });
+BookingSchema.index({ serviceId: 1, chefLevel: 1, status: 1 });
 
-/* Client booking history */
-BookingSchema.index({
-  clientId: 1,
-  createdAt: -1,
-});
-
-
-/* Prevent duplicate booking for same chef + time slot */
-BookingSchema.index(
-  { chefId: 1, startDate: 1, endDate: 1 },
-  {
-    unique: true,
-    partialFilterExpression: {
-      chefId: { $exists: true },
-      status: { $in: ["confirmed", "ongoing"] }
-    }
-  }
-);
-
-
-export const Booking = model<IBooking>("Booking", BookingSchema);
+export const BookingModel: Model<IBooking> =
+  mongoose.model("Booking", BookingSchema);

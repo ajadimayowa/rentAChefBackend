@@ -26,7 +26,7 @@ const addOrUpdateClientRating = (req, res) => __awaiter(void 0, void 0, void 0, 
         const { rating, review } = req.body;
         if (!bookingId)
             return res.status(400).json({ success: false, message: 'bookingId is required' });
-        const booking = yield Booking_1.Booking.findById(bookingId);
+        const booking = yield Booking_1.BookingModel.findById(bookingId);
         if (!booking)
             return res.status(404).json({ success: false, message: 'Booking not found' });
         // Ensure actor is the chef for this booking (if actor is Chef)
@@ -34,13 +34,13 @@ const addOrUpdateClientRating = (req, res) => __awaiter(void 0, void 0, void 0, 
         if (booking.chefId && booking.chefId.toString() !== actorId && !actor.isAdmin) {
             return res.status(403).json({ success: false, message: 'You can only rate clients for your bookings' });
         }
-        if (booking.status !== 'completed') {
+        if (booking.status !== 'Completed') {
             return res.status(400).json({ success: false, message: 'Booking must be completed to submit a rating' });
         }
         if (!rating || Number(rating) < 1 || Number(rating) > 5) {
             return res.status(400).json({ success: false, message: 'Rating must be between 1 and 5' });
         }
-        const clientId = booking.clientId;
+        const clientId = booking.customerId.toString();
         const r = yield ClientRating_1.ClientRating.findOneAndUpdate({ bookingId }, { chefId: actorId, clientId, bookingId, rating: Number(rating), review }, { upsert: true, new: true, setDefaultsOnInsert: true });
         // Recompute client average rating and persist on User
         try {

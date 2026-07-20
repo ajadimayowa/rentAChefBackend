@@ -1,6 +1,16 @@
 import { Request, Response } from "express";
 import Category from "../../models/Category";
 
+const parseTaskIndex = (taskIndexParam: string): number | null => {
+  const parsedIndex = Number(taskIndexParam);
+
+  if (!Number.isInteger(parsedIndex) || parsedIndex < 0) {
+    return null;
+  }
+
+  return parsedIndex;
+};
+
 /**
  * Create Category
  */
@@ -96,5 +106,104 @@ export const deleteCategory = async (req: Request, res: Response): Promise<any> 
     return res.status(200).json({ success: true, message: "Category deleted successfully" });
   } catch (error) {
     return res.status(400).json({ success: false, message: "Invalid category ID" });
+  }
+};
+
+/**
+ * Add Task to Category
+ */
+export const addTaskToCategory = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const { id } = req.params;
+    const task = String(req.body.task || "").trim();
+
+    if (!task) {
+      return res.status(400).json({ success: false, message: "task is required" });
+    }
+
+    const category = await Category.findById(id);
+
+    if (!category) {
+      return res.status(404).json({ success: false, message: "Category not found" });
+    }
+
+    if (category.tasks.includes(task)) {
+      return res.status(409).json({ success: false, message: "Task already exists in category" });
+    }
+
+    category.tasks.push(task);
+    await category.save();
+
+    return res.status(200).json({ success: true, payload: category });
+  } catch (error: any) {
+    return res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * Update Category Task
+ */
+export const updateCategoryTask = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const { id, taskIndex } = req.params;
+    const updatedTask = String(req.body.task || "").trim();
+
+    if (!updatedTask) {
+      return res.status(400).json({ success: false, message: "task is required" });
+    }
+
+    const parsedTaskIndex = parseTaskIndex(taskIndex);
+
+    if (parsedTaskIndex === null) {
+      return res.status(400).json({ success: false, message: "taskIndex must be a valid non-negative integer" });
+    }
+
+    const category = await Category.findById(id);
+
+    if (!category) {
+      return res.status(404).json({ success: false, message: "Category not found" });
+    }
+
+    if (parsedTaskIndex >= category.tasks.length) {
+      return res.status(404).json({ success: false, message: "Task not found" });
+    }
+
+    category.tasks[parsedTaskIndex] = updatedTask;
+    await category.save();
+
+    return res.status(200).json({ success: true, payload: category });
+  } catch (error: any) {
+    return res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * Delete Category Task
+ */
+export const deleteCategoryTask = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const { id, taskIndex } = req.params;
+    const parsedTaskIndex = parseTaskIndex(taskIndex);
+
+    if (parsedTaskIndex === null) {
+      return res.status(400).json({ success: false, message: "taskIndex must be a valid non-negative integer" });
+    }
+
+    const category = await Category.findById(id);
+
+    if (!category) {
+      return res.status(404).json({ success: false, message: "Category not found" });
+    }
+
+    if (parsedTaskIndex >= category.tasks.length) {
+      return res.status(404).json({ success: false, message: "Task not found" });
+    }
+
+    category.tasks.splice(parsedTaskIndex, 1);
+    await category.save();
+
+    return res.status(200).json({ success: true, payload: category });
+  } catch (error: any) {
+    return res.status(400).json({ success: false, message: error.message });
   }
 };

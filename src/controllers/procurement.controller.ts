@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import Procurement from '../models/Procurement';
 import axios from 'axios';
 import { Types } from 'mongoose';
-import { Booking } from '../models/Booking';
+import { BookingModel } from '../models/Booking';
 import Notification from '../models/Notification';
 
 export const createProcurement = async (req: Request, res: Response): Promise<any> => {
@@ -14,7 +14,7 @@ export const createProcurement = async (req: Request, res: Response): Promise<an
     }
 
     // ensure booking exists
-    const booking = await Booking.findById(bookingId);
+    const booking = await BookingModel.findById(bookingId);
     if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
 
     const createPayload: any = { bookingId, items };
@@ -25,13 +25,13 @@ export const createProcurement = async (req: Request, res: Response): Promise<an
     const procurement = await Procurement.create(createPayload);
 
     // attach procurement to booking
-    booking.procurementId = procurement._id as any;
+    booking.procurement = procurement._id as any;
     await booking.save();
 
     // Notify customer that procurement has been added to their booking
     try {
       await Notification.create({
-        userId: booking.clientId,
+        userId: booking.customerId,
         type: 'procurement-update',
         title: 'Procurement added to booking',
         message: `Additional procurement items were added to your booking. Total: ${procurement.totalCost}`,
@@ -62,9 +62,9 @@ export const userPayProcurement = async (req: Request, res: Response): Promise<a
     if (!procurement) return res.status(404).json({ success: false, message: 'Procurement not found' });
 
     // ensure procurement belongs to a booking owned by user
-    const booking = await Booking.findById(procurement.bookingId);
+    const booking = await BookingModel.findById(procurement.bookingId);
     if (!booking) return res.status(404).json({ success: false, message: 'Associated booking not found' });
-    if (String(booking.clientId) !== String(user._id)) return res.status(403).json({ success: false, message: 'Not allowed to pay this procurement' });
+    if (String(booking.customerId) !== String(user._id)) return res.status(403).json({ success: false, message: 'Not allowed to pay this procurement' });
 
     // reuse existing mark logic for paystack or transfer
     if (paymentChannel === 'transfer') {
@@ -249,9 +249,9 @@ export const deleteProcurement = async (req: Request, res: Response): Promise<an
 
     // unlink from booking if attached
     try {
-      const booking = await Booking.findById(procurement.bookingId);
-      if (booking && String(booking.procurementId) === String(procurement._id)) {
-        booking.procurementId = undefined as any;
+      const booking = await BookingModel.findById(procurement.bookingId);
+      if (booking && String(booking.procurement) === String(procurement._id)) {
+        booking.procurement = undefined as any;
         await booking.save();
       }
     } catch (err) {

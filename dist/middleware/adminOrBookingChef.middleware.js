@@ -42,7 +42,7 @@ const adminOrBookingChef = (req, res, next) => __awaiter(void 0, void 0, void 0,
             const procurement = yield Procurement_1.default.findById(procurementId);
             if (!procurement)
                 return res.status(404).json({ message: 'Procurement not found' });
-            const booking = yield Booking_1.Booking.findById(procurement.bookingId);
+            const booking = yield Booking_1.BookingModel.findById(procurement.bookingId);
             if (!booking)
                 return res.status(404).json({ message: 'Booking not found for procurement' });
             if (String(booking.chefId) !== String(chef._id)) {

@@ -36,7 +36,8 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose_1 = __importStar(require("mongoose"));
 const NotificationSchema = new mongoose_1.Schema({
-    userId: { type: mongoose_1.default.Types.ObjectId, ref: 'User', required: true },
+    userId: { type: mongoose_1.default.Types.ObjectId, ref: 'User', index: true },
+    recipientUserId: { type: mongoose_1.default.Types.ObjectId, ref: 'User', index: true },
     type: {
         type: String,
         enum: [
@@ -52,11 +53,19 @@ const NotificationSchema = new mongoose_1.Schema({
             'event-invitation',
             'system-alert'
         ],
-        required: true
+    },
+    channel: {
+        type: String,
+        enum: ['PUSH', 'EMAIL', 'SMS', 'IN_APP'],
+        index: true,
     },
     title: { type: String, required: true },
-    message: { type: String, required: true },
+    message: { type: String },
+    body: { type: String },
+    metadata: { type: mongoose_1.Schema.Types.Mixed },
     isRead: { type: Boolean, default: false },
+    sentAt: { type: Date },
+    readAt: { type: Date },
 }, {
     timestamps: true,
     toJSON: {
@@ -69,4 +78,5 @@ const NotificationSchema = new mongoose_1.Schema({
         },
     },
 });
+NotificationSchema.index({ recipientUserId: 1, createdAt: -1 });
 exports.default = mongoose_1.default.model('Notification', NotificationSchema);
