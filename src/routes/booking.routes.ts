@@ -11,6 +11,8 @@ import {
   listBookings,
   registerUploadedMenu,
 } from '../controllers/booking.controller';
+import { getBookingDetail } from '../controllers/bookingDetail.controller';
+import { verifyUserToken } from '../middleware/auth.middleware';
 
 const router = Router();
 
@@ -93,6 +95,29 @@ router.post('/bookings', createBooking);
  *               $ref: '#/components/schemas/CPBookingsResponse'
  */
 router.get('/bookings', listBookings);
+
+/**
+ * @openapi
+ * /bookings/{id}:
+ *   get:
+ *     tags:
+ *       - Chef Platform
+ *     summary: Get a single booking — shared by the admin/chef/customer "view booking" pages. Admins can view any booking; chefs and customers only their own.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: OK
+ *       403:
+ *         description: Not the booking's chef/customer, and not an admin
+ *       404:
+ *         description: Booking not found
+ */
+router.get('/bookings/:id', verifyUserToken, getBookingDetail);
 
 /**
  * @openapi

@@ -20,6 +20,19 @@ interface EmailSuccessData {
   orgPrimaryColor?: string; // Optional, to customize the primary color of the email
 }
 
+interface ChefCreationEmailData extends EmailSuccessData {
+  password: string; // default/temporary password to display so the chef can log in
+}
+
+interface ChefApprovalEmailData {
+  firstName: string;
+  email: string;
+  verifyUrl: string; // link to /verify-email?email=...&otp=... so the chef can confirm their address
+  logoUrl?: string;
+  footerUrl?: string;
+  orgPrimaryColor?: string;
+}
+
 interface ILoginOtp {
   firstName: string;
   email: string;
@@ -47,10 +60,8 @@ interface CreatorNotificationEmailData {
 const sendEmailVerificationOtp = async (creatorData: CreatorEmailData) => {
   const { firstName, email, emailVerificationOtp, logoUrl, footerUrl } = creatorData;
   const templatePath = path.join(
-    process.cwd(),
-    'src',
-    'services',
-    'email',
+    __dirname,
+    '..',
     'emailTemps',
     'rentAChef',
     'EmailVerificationOtpTemplate.hbs'
@@ -59,7 +70,7 @@ const sendEmailVerificationOtp = async (creatorData: CreatorEmailData) => {
   const templateSource = fs.readFileSync(templatePath, 'utf-8');
   // Compile the Handlebars templates
   const template = handlebars.compile(templateSource);
-  const html = template({ firstName, email, emailVerificationOtp, orgPrimaryColor: '#ffffffff' });
+  const html = template({ firstName, email, emailVerificationOtp, orgPrimaryColor: '#ffffff' });
   const subject = 'Email Verification';
   const remoteImages = [
     {
@@ -85,10 +96,8 @@ const sendEmailVerificationOtp = async (creatorData: CreatorEmailData) => {
 const sendEmailVerificationSuccessEmail = async (creatorData: EmailSuccessData) => {
   const { firstName, email,logoUrl, footerUrl } = creatorData;
   const templatePath = path.join(
-    process.cwd(),
-    'src',
-    'services',
-    'email',
+    __dirname,
+    '..',
     'emailTemps',
     'rentAChef',
     'EmailVerificationSuccessTemplate.hbs'
@@ -97,7 +106,7 @@ const sendEmailVerificationSuccessEmail = async (creatorData: EmailSuccessData) 
   const templateSource = fs.readFileSync(templatePath, 'utf-8');
   // Compile the Handlebars templates
   const template = handlebars.compile(templateSource);
-  const html = template({ firstName, email,orgPrimaryColor: '#ffffffff' });
+  const html = template({ firstName, email,orgPrimaryColor: '#ffffff' });
   const subject = 'Email Verified';
   const remoteImages = [
     {
@@ -123,10 +132,8 @@ const sendEmailVerificationSuccessEmail = async (creatorData: EmailSuccessData) 
 const sendLoginOtpEmail = async (creatorData: ILoginOtp) => {
   const { firstName, email, loginOtp, logoUrl, footerUrl } = creatorData;
   const templatePath = path.join(
-    process.cwd(),
-    'src',
-    'services',
-    'email',
+    __dirname,
+    '..',
     'emailTemps',
     'rentAChef',
     'LoginOtpEmailTemplate.hbs'
@@ -135,7 +142,7 @@ const sendLoginOtpEmail = async (creatorData: ILoginOtp) => {
   const templateSource = fs.readFileSync(templatePath, 'utf-8');
   // Compile the Handlebars templates
   const template = handlebars.compile(templateSource);
-  const html = template({ firstName, email, loginOtp, orgPrimaryColor: '#ffffffff' });
+  const html = template({ firstName, email, loginOtp, orgPrimaryColor: '#ffffff' });
   const subject = 'Login OTP';
   const remoteImages = [
     {
@@ -156,13 +163,11 @@ const sendLoginOtpEmail = async (creatorData: ILoginOtp) => {
 
 }
 
-const sendChefCreationSuccessEmail = async (creatorData: EmailSuccessData) => {
-  const { firstName, email,logoUrl, footerUrl } = creatorData;
+const sendChefCreationSuccessEmail = async (creatorData: ChefCreationEmailData) => {
+  const { firstName, email, password, logoUrl, footerUrl } = creatorData;
   const templatePath = path.join(
-    process.cwd(),
-    'src',
-    'services',
-    'email',
+    __dirname,
+    '..',
     'emailTemps',
     'rentAChef',
     'ChefCreationSuccessEmailTemplate.hbs'
@@ -171,8 +176,44 @@ const sendChefCreationSuccessEmail = async (creatorData: EmailSuccessData) => {
   const templateSource = fs.readFileSync(templatePath, 'utf-8');
   // Compile the Handlebars templates
   const template = handlebars.compile(templateSource);
-  const html = template({ firstName, email,orgPrimaryColor: '#ffffffff' });
+  const html = template({ firstName, email, password, orgPrimaryColor: '#ffffff' });
   const subject = 'Profile Created';
+  const remoteImages = [
+    {
+      url: logoUrl || 'https://rentachefdev.s3.eu-north-1.amazonaws.com/assets/chefLogo.png',
+      cid: 'logo',
+    },
+    {
+      url: footerUrl || 'https://rentachefdev.s3.eu-north-1.amazonaws.com/assets/chefFooter.jpg',
+      cid: 'footer',
+    },
+  ];
+  try {
+    console.log({sendingTo:email})
+    await sendMail({userEmail:email, subject, html, remoteImages});
+    console.log('email sent successfully!');
+  } catch (error) {
+    console.error('Error email:', error);
+  }
+
+}
+
+
+const sendChefApprovedEmail = async (creatorData: ChefApprovalEmailData) => {
+  const { firstName, email, verifyUrl, logoUrl, footerUrl } = creatorData;
+  const templatePath = path.join(
+    __dirname,
+    '..',
+    'emailTemps',
+    'rentAChef',
+    'ChefApprovedEmailTemplate.hbs'
+  );
+
+  const templateSource = fs.readFileSync(templatePath, 'utf-8');
+  // Compile the Handlebars templates
+  const template = handlebars.compile(templateSource);
+  const html = template({ firstName, email, verifyUrl, orgPrimaryColor: '#ffffff' });
+  const subject = 'Your chef account is approved';
   const remoteImages = [
     {
       url: logoUrl || 'https://rentachefdev.s3.eu-north-1.amazonaws.com/assets/chefLogo.png',
@@ -197,10 +238,8 @@ const sendChefCreationSuccessEmail = async (creatorData: EmailSuccessData) => {
 const sendPasswordChangeSuccessEmail = async (creatorData: EmailSuccessData) => {
   const { firstName, email,logoUrl, footerUrl } = creatorData;
   const templatePath = path.join(
-    process.cwd(),
-    'src',
-    'services',
-    'email',
+    __dirname,
+    '..',
     'emailTemps',
     'rentAChef',
     'PasswordResetSuccessEmailTemplate.hbs'
@@ -209,7 +248,7 @@ const sendPasswordChangeSuccessEmail = async (creatorData: EmailSuccessData) => 
   const templateSource = fs.readFileSync(templatePath, 'utf-8');
   // Compile the Handlebars templates
   const template = handlebars.compile(templateSource);
-  const html = template({ firstName, email,orgPrimaryColor: '#ffffffff' });
+  const html = template({ firstName, email,orgPrimaryColor: '#ffffff' });
   const subject = 'Password changed';
   const remoteImages = [
     {
@@ -235,10 +274,8 @@ const sendRegistrationNotificationEmail2 = async (creatorData: CreatorNotificati
   const { firstName, email, logoUrl, footerUrl } = creatorData;
   const loginTime = new Date().toLocaleString(); // Get the current date and time
   const templatePath = path.join(
-    process.cwd(),
-    'src',
-    'services',
-    'email',
+    __dirname,
+    '..',
     'emailTemps',
     'creator',
     'CreatorLoginEmailTemplate.hbs'
@@ -247,7 +284,7 @@ const sendRegistrationNotificationEmail2 = async (creatorData: CreatorNotificati
   const templateSource = fs.readFileSync(templatePath, 'utf-8');
   // Compile the Handlebars templates
   const template = handlebars.compile(templateSource);
-  const html = template({ firstName, email, orgPrimaryColor: '#ffffffff', loginTime });
+  const html = template({ firstName, email, orgPrimaryColor: '#ffffff', loginTime });
   const subject = 'Root Admin Login.';
   const remoteImages = [
     {
@@ -272,10 +309,8 @@ const sendRegistrationNotificationEmail2 = async (creatorData: CreatorNotificati
 const sendUserPasswordResetOTPEmail = async (creatorData: IPasswordReset) => {
   const { firstName, email, loginOtp} = creatorData;
   const templatePath = path.join(
-    process.cwd(),
-    'src',
-    'services',
-    'email',
+    __dirname,
+    '..',
     'emailTemps',
     'rentAChef',
     'PaswordResetOtpEmailTemplate.hbs'
@@ -284,7 +319,7 @@ const sendUserPasswordResetOTPEmail = async (creatorData: IPasswordReset) => {
   const templateSource = fs.readFileSync(templatePath, 'utf-8');
   // Compile the Handlebars templates
   const template = handlebars.compile(templateSource);
-  const html = template({ firstName, email, loginOtp, orgPrimaryColor: '#ffffffff' });
+  const html = template({ firstName, email, loginOtp, orgPrimaryColor: '#ffffff' });
   const subject = 'Password reset otp';
   const remoteImages = [
     {
@@ -305,11 +340,12 @@ const sendUserPasswordResetOTPEmail = async (creatorData: IPasswordReset) => {
 
 }
 
-export { 
+export {
   sendEmailVerificationOtp,
   sendLoginOtpEmail,
   sendEmailVerificationSuccessEmail,
   sendChefCreationSuccessEmail,
+  sendChefApprovedEmail,
   sendUserPasswordResetOTPEmail,
   sendPasswordChangeSuccessEmail
 }

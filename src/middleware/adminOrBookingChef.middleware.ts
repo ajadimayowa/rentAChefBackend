@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import UserModel from '../models/User.model';
-import Chef from '../models/Chef';
 import Procurement from '../models/Procurement';
 import { BookingModel } from '../models/Booking';
 
@@ -13,18 +12,17 @@ export const adminOrBookingChef = async (req: Request, res: Response, next: Next
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as any;
 
-    // If admin user
     const user = await UserModel.findById(decoded.id);
-    if (user && user.isAdmin) {
+    if (!user) return res.status(403).json({ message: 'Invalid token' });
+
+    // If admin user
+    if (user.userType === 'Admin') {
       (req as any).user = user;
       return next();
     }
 
-    // If chef role, ensure they own the booking linked to procurement
-    if (decoded.role === 'chef') {
-      const chef = await Chef.findById(decoded.id);
-      if (!chef) return res.status(403).json({ message: 'Invalid chef token' });
-
+    // If chef, ensure they own the booking linked to procurement
+    if (user.userType === 'Chef') {
       const procurementId = req.params.id;
       if (!procurementId) return res.status(400).json({ message: 'Procurement id required' });
 
@@ -34,11 +32,11 @@ export const adminOrBookingChef = async (req: Request, res: Response, next: Next
       const booking = await BookingModel.findById(procurement.bookingId);
       if (!booking) return res.status(404).json({ message: 'Booking not found for procurement' });
 
-      if (String(booking.chefId) !== String(chef._id)) {
+      if (String(booking.chefId) !== String(user._id)) {
         return res.status(403).json({ message: 'Not authorized for this procurement' });
       }
 
-      (req as any).user = chef;
+      (req as any).user = user;
       return next();
     }
 

@@ -5,88 +5,14 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const chef_controller_1 = require("../controllers/chef.controller");
+const chefLevel_controller_1 = require("../controllers/chefLevel.controller");
 const isAdmin_1 = require("../middleware/isAdmin");
 const upload_1 = __importDefault(require("../middleware/upload"));
-const adminAuth_1 = require("../middleware/adminAuth");
+const adminAuth_middleware_1 = require("../middleware/auth/adminAuth.middleware");
+const chefAuth_middleware_1 = require("../middleware/auth/chefAuth.middleware");
 // import { isAdmin } from "../middlewares/isAdmin";
 // import { protect } from "../middlewares/auth";
 const router = express_1.default.Router();
-/**
- * @openapi
- * /chef/auth/login:
- *   post:
- *     tags:
- *       - Chef
- *     summary: Chef login
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/ChefLoginRequest'
- *     responses:
- *       200:
- *         description: OK
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/AuthResponse'
- */
-router.post("/chef/auth/login", chef_controller_1.loginChef);
-/**
- * @openapi
- * /chef/auth/request-password-reset-otp:
- *   post:
- *     tags:
- *       - Chef
- *     summary: Request chef password reset OTP
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/AuthPasswordResetRequest'
- *     responses:
- *       200:
- *         description: OK
- */
-router.post('/chef/auth/request-password-reset-otp', chef_controller_1.requestChefPasswordChangeOtp);
-/**
- * @openapi
- * /chef/auth/reset-password-with-otp:
- *   post:
- *     tags:
- *       - Chef
- *     summary: Reset chef password with OTP
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/AuthResetWithOtpRequest'
- *     responses:
- *       200:
- *         description: OK
- */
-router.post('/chef/auth/reset-password-with-otp', chef_controller_1.changeChefPasswordWithOtp);
-/**
- * @openapi
- * /chef/dashboard:
- *   post:
- *     tags:
- *       - Chef
- *     summary: Chef dashboard action
- *     requestBody:
- *       required: false
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *     responses:
- *       200:
- *         description: OK
- */
-router.post('/chef/dashboard', chef_controller_1.changeChefPasswordWithOtp);
 // Public / Authenticated
 /**
  * @openapi
@@ -153,6 +79,48 @@ router.post('/chef/dashboard', chef_controller_1.changeChefPasswordWithOtp);
 router.get("/chefs", chef_controller_1.getAllChefs);
 /**
  * @openapi
+ * /chef/levels:
+ *   get:
+ *     tags:
+ *       - Chef
+ *     summary: List chef levels
+ *     responses:
+ *       200:
+ *         description: OK
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/ChefLevel'
+ */
+router.get("/chef/levels", chefLevel_controller_1.getAllChefLevels);
+/**
+ * @openapi
+ * /chef/dashboard:
+ *   get:
+ *     tags:
+ *       - Chef
+ *     summary: Get the logged-in chef's dashboard summary
+ *     responses:
+ *       200:
+ *         description: OK
+ */
+router.get("/chef/dashboard", chefAuth_middleware_1.requireChefAuth, chef_controller_1.getChefDashboard);
+/**
+ * @openapi
+ * /chef/bookings:
+ *   get:
+ *     tags:
+ *       - Chef
+ *     summary: List the logged-in chef's bookings
+ *     responses:
+ *       200:
+ *         description: OK
+ */
+router.get("/chef/bookings", chefAuth_middleware_1.requireChefAuth, chef_controller_1.getChefBookings);
+/**
+ * @openapi
  * /chef/{id}:
  *   get:
  *     tags:
@@ -200,7 +168,7 @@ router.get("/chef/:id", chef_controller_1.getChefById);
  *             schema:
  *               $ref: '#/components/schemas/Chef'
  */
-router.put("/chef/:id", adminAuth_1.adminAuth, upload_1.default.single("chefPic"), chef_controller_1.updateChef);
+router.put("/chef/:id", adminAuth_middleware_1.requireAdminAuth, upload_1.default.single("chefPic"), chef_controller_1.updateChef);
 // Admin only
 /**
  * @openapi
@@ -209,6 +177,7 @@ router.put("/chef/:id", adminAuth_1.adminAuth, upload_1.default.single("chefPic"
  *     tags:
  *       - Chef
  *     summary: Create chef (admin)
+ *     description: Creates a chef profile and sends a "profile created" notification email to the chef, including their default/temporary password and a reminder to update it.
  *     requestBody:
  *       required: true
  *       content:
@@ -223,7 +192,7 @@ router.put("/chef/:id", adminAuth_1.adminAuth, upload_1.default.single("chefPic"
  *             schema:
  *               $ref: '#/components/schemas/Chef'
  */
-router.post("/chef/create", adminAuth_1.adminAuth, upload_1.default.single("chefPic"), chef_controller_1.createChef);
+router.post("/chef/create", adminAuth_middleware_1.requireAdminAuth, upload_1.default.single("chefPic"), chef_controller_1.createChef);
 /**
  * @openapi
  * /chef/disable/{id}:

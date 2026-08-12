@@ -1,5 +1,4 @@
 import express from 'express';
-import { auth } from '../middleware/customer.middleware';
 import { toggleFavorite, getUserFavorites } from '../controllers/favorite.controller';
 import { verifyToken } from '../middleware/auth.middleware';
 

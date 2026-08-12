@@ -45,35 +45,60 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.checkChefAvailability = exports.deleteChef = exports.disableChef = exports.updateChef = exports.getChefById = exports.getAllChefs = exports.changeChefPasswordWithOtp = exports.requestChefPasswordChangeOtp = exports.loginChef = exports.createChef = void 0;
-const Chef_1 = __importDefault(require("../models/Chef"));
+exports.checkChefAvailability = exports.deleteChef = exports.disableChef = exports.updateChefStatus = exports.updateChef = exports.getChefBookings = exports.getChefDashboard = exports.getChefById = exports.getAllChefs = exports.createChef = void 0;
+const User_model_1 = __importDefault(require("../models/User.model"));
 const mongoose_1 = __importDefault(require("mongoose"));
-const bcryptjs_1 = __importDefault(require("bcryptjs"));
-const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
-const usersEmailNotifs_1 = require("../services/email/rentAChef/usersEmailNotifs");
 const chefsEmailNotification_1 = require("../services/email/rentAChef/chefsEmailNotification");
-const Category_1 = __importDefault(require("../models/Category"));
 const ChefService_1 = require("../models/ChefService");
 const Booking_1 = require("../models/Booking");
-const otpUtils_1 = require("../utils/otpUtils");
 const checkChefAvailability_1 = require("../utils/checkChefAvailability");
 const Menu_1 = __importDefault(require("../models/Menu"));
+const otpUtils_1 = require("../utils/otpUtils");
+const auth_service_1 = require("../services/auth/auth.service");
+const bookingStatus_1 = require("../utils/bookingStatus");
+/**
+ * Services offered live in the ChefService collection, not on
+ * `chefDetails.servicesOffered` — this resolves the real assigned services for a
+ * batch of chefs and stitches them onto each chef's JSON so admin list/edit views
+ * (which only look at `chefDetails.servicesOffered`) see the actual selection.
+ */
+const attachServicesOffered = (chefs) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const chefIds = chefs.map((c) => c._id);
+    const chefServices = yield ChefService_1.ChefService.find({ chefId: { $in: chefIds }, isAvailable: true }).lean();
+    const servicesByChef = new Map();
+    for (const cs of chefServices) {
+        const key = cs.chefId.toString();
+        const list = (_a = servicesByChef.get(key)) !== null && _a !== void 0 ? _a : [];
+        list.push(cs.serviceId.toString());
+        servicesByChef.set(key, list);
+    }
+    return chefs.map((c) => {
+        var _a;
+        const obj = typeof c.toJSON === "function" ? c.toJSON() : c;
+        obj.chefDetails = Object.assign(Object.assign({}, (obj.chefDetails || {})), { servicesOffered: (_a = servicesByChef.get(c._id.toString())) !== null && _a !== void 0 ? _a : [] });
+        return obj;
+    });
+});
 const createChef = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const chefPic = req.file; // multer file
-        const { staffId, name, gender, email, bio, phoneNumber, specialties, location, state, stateId, defaultPassword, category, yearsOfExperience, rating, dob } = req.body;
+        const { name, gender, email, phone, bio, dob, specialties, stateId, stateName, city, defaultPassword, yearsOfExperience, chefLevel, servicesOffered } = req.body;
+        const staffId = (0, otpUtils_1.generateStaffId)();
+        const fullName = name.trim();
+        const firstName = fullName.split(" ")[0];
+        const phoneNumber = (0, otpUtils_1.formatNigerianPhoneNumber)(phone);
         // console.log({ adminSent: req.body });
-        if (!staffId || !name || !email || !location || !state || !category) {
-            return res.status(400).json({ message: "staffId, category, location, state, name & email are required" });
+        if (!staffId || !fullName || !email || !city || !stateId || !phone) {
+            return res.status(400).json({ message: "city, state, phone number, name & email are required" });
         }
         // Check if chef already exists
-        const exists = yield Chef_1.default.findOne({ $or: [{ email }, { staffId }] });
+        const exists = yield User_model_1.default.findOne({ $or: [{ email }, { "chefDetails.staffId": staffId }] });
         if (exists) {
             return res.status(400).json({ message: "Chef already exists" });
         }
-        // Handle password
+        // Handle password (plaintext here — pre-save hook hashes it on create)
         const pass = defaultPassword || "Chef@123";
-        const hashedPassword = yield bcryptjs_1.default.hash(pass, 12);
         // // Parse specialties JSON
         // let specialtiesArray: string[] = [];
         // try {
@@ -81,27 +106,33 @@ const createChef = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         // } catch (err) {
         //     return res.status(400).json({ message: "Invalid specialties format. Should be an array of strings." });
         // }
-        //  const categoryName1 = await Category.findById(category).select("name");
         // Create chef
-        const chef = yield Chef_1.default.create({
-            staffId,
-            name,
+        const chef = yield User_model_1.default.create({
+            userType: "Chef",
+            isActive: false,
+            fullName,
+            firstName,
             gender,
             email,
-            bio,
-            specialties,
-            location,
-            state,
-            category,
-            stateId,
-            profilePic: (chefPic === null || chefPic === void 0 ? void 0 : chefPic.location) || (chefPic === null || chefPic === void 0 ? void 0 : chefPic.path) || "", // depending on S3 or local
             phoneNumber,
+            address: { stateId, stateName, city },
             dob,
+            password: pass,
+            chefDetails: {
+                staffId,
+                bio,
+                yearsOfExperience,
+                specialties,
+                chefLevel,
+                servicesOffered
+            },
+            profilePic: (chefPic === null || chefPic === void 0 ? void 0 : chefPic.location) || (chefPic === null || chefPic === void 0 ? void 0 : chefPic.path) || "", // depending on S3 or local
         });
         try {
             yield (0, chefsEmailNotification_1.sendChefCreationSuccessEmail)({
                 email,
-                firstName: name
+                firstName: fullName,
+                password: pass,
             });
         }
         catch (error) {
@@ -118,10 +149,12 @@ const createChef = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
                 createdServices = results.filter((r) => r.status === 'fulfilled').map((r) => r.value);
                 dupCount = results.filter((r) => r.status === 'rejected' && r.reason && r.reason.code === 11000).length;
             }
+            const [payload] = yield attachServicesOffered([chef]);
             return res.status(201).json({
+                success: true,
                 message: "Chef created successfully",
+                payload,
                 defaultPassword: pass,
-                chef,
                 chefServicesCreated: createdServices,
                 chefServicesDuplicatesSkipped: dupCount
             });
@@ -129,9 +162,10 @@ const createChef = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         catch (err) {
             console.warn('Failed to create chef services:', err);
             return res.status(201).json({
+                success: true,
                 message: "Chef created successfully (services creation failed)",
-                defaultPassword: pass,
-                chef
+                payload: chef,
+                defaultPassword: pass
             });
         }
     }
@@ -141,121 +175,6 @@ const createChef = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
     }
 });
 exports.createChef = createChef;
-const loginChef = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { email, password } = req.body;
-        if (!email || !password) {
-            return res.status(400).json({ message: "Email and password are required" });
-        }
-        const chef = yield Chef_1.default.findOne({ email });
-        if (!chef) {
-            return res.status(404).json({ message: "Chef not found" });
-        }
-        const isMatch = yield bcryptjs_1.default.compare(password, chef.password);
-        if (!isMatch) {
-            return res.status(401).json({ message: "Invalid password" });
-        }
-        // Generate JWT token
-        const token = jsonwebtoken_1.default.sign({ id: chef._id, email: chef.email, staffId: chef.staffId }, process.env.JWT_SECRET || "your_jwt_secret", { expiresIn: "7d" });
-        return res.status(200).json({
-            success: true,
-            message: "Login successful",
-            token,
-            payload: {
-                id: chef._id,
-                staffId: chef.staffId,
-                name: chef.name,
-                email: chef.email,
-                profilePic: chef.profilePic,
-                isActive: chef.isActive
-            }
-        });
-    }
-    catch (error) {
-        console.error(error);
-        return res.status(500).json({ message: "Error logging in chef", error });
-    }
-});
-exports.loginChef = loginChef;
-/**
- * REQUEST PASSWORD CHANGE OTP
- */
-const requestChefPasswordChangeOtp = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { email } = req.body;
-        const chef = yield Chef_1.default.findOne({ email });
-        if (!chef) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-        const otp = (0, otpUtils_1.generateOtp)();
-        chef.loginOtp = otp;
-        chef.loginOtpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
-        yield chef.save();
-        // await sendEmail(
-        //   user.email,
-        //   'Password Reset OTP',
-        //   `Your password reset OTP is ${otp}. It expires in 10 minutes.`
-        // );
-        // Send OTP via email
-        try {
-            yield (0, usersEmailNotifs_1.sendUserPasswordResetOTPEmail)({
-                firstName: chef.name,
-                email: chef.email,
-                loginOtp: otp,
-            });
-        }
-        catch (error) {
-            console.error("Error sending OTP email:", error);
-            // Don't block login flow if email fails, just log it
-        }
-        return res.status(200).json({
-            success: true,
-            message: 'Password reset OTP sent to email',
-        });
-    }
-    catch (error) {
-        return res.status(500).json({ message: 'Server error' });
-    }
-});
-exports.requestChefPasswordChangeOtp = requestChefPasswordChangeOtp;
-const changeChefPasswordWithOtp = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { email, otp, newPassword } = req.body;
-        const chef = yield Chef_1.default.findOne({ email });
-        if (!chef || !chef.loginOtp || !chef.loginOtpExpires) {
-            return res.status(400).json({ message: 'Invalid request' });
-        }
-        if (chef.loginOtp !== otp) {
-            return res.status(400).json({ message: 'Invalid OTP' });
-        }
-        if (chef.loginOtpExpires < new Date()) {
-            return res.status(400).json({ message: 'OTP expired' });
-        }
-        const hashedPassword = yield bcryptjs_1.default.hash(newPassword, 10);
-        chef.password = hashedPassword;
-        // clear otp
-        chef.loginOtp = undefined;
-        chef.loginOtpExpires = undefined;
-        yield chef.save();
-        try {
-            yield (0, usersEmailNotifs_1.sendPasswordChangeSuccessEmail)({
-                firstName: chef.name,
-                email: chef.name,
-            });
-        }
-        catch (error) {
-            console.log(error);
-        }
-        return res.status(200).json({
-            success: true,
-            message: 'Password changed successfully',
-        });
-    }
-    catch (error) {
-        return res.status(500).json({ message: 'Server error' });
-    }
-});
-exports.changeChefPasswordWithOtp = changeChefPasswordWithOtp;
 const getAllChefs = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         // Pagination
@@ -276,17 +195,16 @@ const getAllChefs = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             return undefined;
         };
         const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        const location = getQueryValue("location", "lga");
+        const city = getQueryValue("location", "lga", "city", "long", "lat");
         const state = getQueryValue("state", "stateName");
         const isActiveQuery = getQueryValue("isActive", "active");
         const name = getQueryValue("name", "search", "q");
-        const category = getQueryValue("category", "categoryId", "categoryName", "chefCategoryId");
-        const filter = {};
-        if (location) {
-            filter.location = { $regex: escapeRegex(location), $options: "i" };
+        const filter = { userType: "Chef" };
+        if (city) {
+            filter["address.city"] = { $regex: escapeRegex(city), $options: "i" };
         }
         if (state) {
-            filter.state = { $regex: escapeRegex(state), $options: "i" };
+            filter["address.stateName"] = { $regex: escapeRegex(state), $options: "i" };
         }
         if (isActiveQuery !== undefined) {
             const normalizedActive = isActiveQuery.toLowerCase();
@@ -299,43 +217,19 @@ const getAllChefs = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         }
         // 🔍 Search by chef name (case-insensitive, partial match)
         if (name) {
-            filter.name = { $regex: escapeRegex(name), $options: "i" };
-        }
-        if (category) {
-            const categoryQuery = String(category).trim();
-            if (mongoose_1.default.Types.ObjectId.isValid(categoryQuery)) {
-                filter.category = categoryQuery;
-            }
-            else {
-                const escapedCategory = escapeRegex(categoryQuery);
-                const matchedCategory = yield Category_1.default.findOne({
-                    name: { $regex: `^${escapedCategory}$`, $options: "i" },
-                }).select("_id");
-                if (!matchedCategory) {
-                    return res.status(200).json({
-                        success: true,
-                        meta: {
-                            total: 0,
-                            page,
-                            limit,
-                            totalPages: 0,
-                        },
-                        payload: [],
-                    });
-                }
-                filter.category = matchedCategory._id;
-            }
+            filter.fullName = { $regex: escapeRegex(name), $options: "i" };
         }
         // Query
         const [chefs, total] = yield Promise.all([
-            Chef_1.default.find(filter)
-                .populate("category name")
+            User_model_1.default.find(filter)
                 .select("-password")
+                .populate("chefDetails.chefLevel", "name description")
                 .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(limit),
-            Chef_1.default.countDocuments(filter),
+            User_model_1.default.countDocuments(filter),
         ]);
+        const payload = yield attachServicesOffered(chefs);
         return res.status(200).json({
             success: true,
             meta: {
@@ -344,7 +238,7 @@ const getAllChefs = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 limit,
                 totalPages: Math.ceil(total / limit),
             },
-            payload: chefs,
+            payload,
         });
     }
     catch (error) {
@@ -364,19 +258,18 @@ const getChefById = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             res.status(400).json({ success: false, message: "Invalid ID" });
             return;
         }
-        const chef = yield Chef_1.default.findById(id)
+        const chef = yield User_model_1.default.findOne({ _id: id, userType: "Chef" })
             .select("-password") // ✅ exclude password
-            .populate('category', 'name');
+            .populate("chefDetails.chefLevel", "name description");
         if (!chef) {
             res.status(404).json({ success: false, message: "Chef not found" });
             return;
         }
         // compute booking counts
-        const now = new Date();
         const [totalChefBooking, totalCompletedBooking, totalUpcoming] = yield Promise.all([
             Booking_1.BookingModel.countDocuments({ chefId: id }),
-            Booking_1.BookingModel.countDocuments({ chefId: id, status: 'completed' }),
-            Booking_1.BookingModel.countDocuments({ chefId: id, status: { $in: ['confirmed', 'ongoing'] }, startDate: { $gte: now } }),
+            Booking_1.BookingModel.countDocuments({ chefId: id, status: 'Completed' }),
+            Booking_1.BookingModel.countDocuments({ chefId: id, status: { $nin: bookingStatus_1.CLOSED_BOOKING_STATUSES } }),
         ]);
         // fetch recent menus for this chef (last 3)
         const getTheChefMenu = yield Menu_1.default.find({ chefId: id }).sort({ createdAt: -1 }).limit(3).lean();
@@ -405,6 +298,110 @@ const getChefById = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     }
 });
 exports.getChefById = getChefById;
+// ✅ Chef's own dashboard summary (auth required — reads the logged-in chef)
+const getChefDashboard = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c;
+    try {
+        const chefId = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
+        const [jobsCompleted, upcomingBookingsCount, earningsAgg, upcomingBookingsRaw] = yield Promise.all([
+            Booking_1.BookingModel.countDocuments({ chefId, status: "Completed" }),
+            Booking_1.BookingModel.countDocuments({ chefId, status: { $nin: bookingStatus_1.CLOSED_BOOKING_STATUSES } }),
+            Booking_1.BookingModel.aggregate([
+                { $match: { chefId: new mongoose_1.default.Types.ObjectId(chefId), paymentStatus: "Paid" } },
+                { $group: { _id: null, total: { $sum: { $ifNull: ["$pricingSnapshot.estimatedTotalMinor", 0] } } } },
+            ]),
+            Booking_1.BookingModel.find({ chefId, status: { $nin: bookingStatus_1.CLOSED_BOOKING_STATUSES } })
+                .select("bookingNumber customerId serviceId status pricingSnapshot startDate bookingData createdAt")
+                .populate("customerId", "fullName")
+                .populate("serviceId", "name")
+                .sort({ createdAt: -1 })
+                .limit(5),
+        ]);
+        const chef = req.user;
+        return res.status(200).json({
+            success: true,
+            payload: {
+                metrics: {
+                    upcomingBookings: upcomingBookingsCount,
+                    jobsCompleted,
+                    rating: ((_b = chef === null || chef === void 0 ? void 0 : chef.chefDetails) === null || _b === void 0 ? void 0 : _b.rating) || 0,
+                    lifetimeEarnings: (0, bookingStatus_1.minorToNaira)(((_c = earningsAgg === null || earningsAgg === void 0 ? void 0 : earningsAgg[0]) === null || _c === void 0 ? void 0 : _c.total) || 0),
+                },
+                upcomingBookings: upcomingBookingsRaw.map((booking) => {
+                    var _a, _b, _c;
+                    return ({
+                        id: booking._id,
+                        bookingNumber: booking.bookingNumber,
+                        customerName: ((_a = booking.customerId) === null || _a === void 0 ? void 0 : _a.fullName) || "Unassigned",
+                        serviceName: ((_b = booking.serviceId) === null || _b === void 0 ? void 0 : _b.name) || "—",
+                        date: (0, bookingStatus_1.bestEffortBookingDate)(booking),
+                        guests: (0, bookingStatus_1.bestEffortGuestCount)(booking.bookingData),
+                        amount: (0, bookingStatus_1.minorToNaira)(((_c = booking.pricingSnapshot) === null || _c === void 0 ? void 0 : _c.estimatedTotalMinor) || 0),
+                        status: booking.status,
+                    });
+                }),
+            },
+        });
+    }
+    catch (error) {
+        console.error("Chef Dashboard Error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Error fetching chef dashboard",
+            error,
+        });
+    }
+});
+exports.getChefDashboard = getChefDashboard;
+// ✅ Chef's own booking list (auth required — scoped to the logged-in chef)
+const getChefBookings = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const chefId = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
+        const page = Math.max(Number(req.query.page) || 1, 1);
+        const limit = Math.max(Number(req.query.limit) || 10, 1);
+        const skip = (page - 1) * limit;
+        const status = req.query.status;
+        const filter = { chefId };
+        if (status && status !== "all")
+            filter.status = status;
+        const [bookings, total] = yield Promise.all([
+            Booking_1.BookingModel.find(filter)
+                .select("bookingNumber customerId serviceId workflow status paymentStatus pricingSnapshot startDate bookingData createdAt")
+                .populate("customerId", "fullName")
+                .populate("serviceId", "name")
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit),
+            Booking_1.BookingModel.countDocuments(filter),
+        ]);
+        return res.status(200).json({
+            success: true,
+            meta: { total, page, limit, totalPages: Math.ceil(total / limit) || 1 },
+            payload: bookings.map((b) => {
+                var _a, _b, _c;
+                return ({
+                    id: b._id,
+                    bookingNumber: b.bookingNumber,
+                    customerName: ((_a = b.customerId) === null || _a === void 0 ? void 0 : _a.fullName) || "Unassigned",
+                    serviceName: ((_b = b.serviceId) === null || _b === void 0 ? void 0 : _b.name) || "—",
+                    workflow: b.workflow,
+                    status: b.status,
+                    paymentStatus: b.paymentStatus,
+                    date: (0, bookingStatus_1.bestEffortBookingDate)(b),
+                    guests: (0, bookingStatus_1.bestEffortGuestCount)(b.bookingData),
+                    amount: (0, bookingStatus_1.minorToNaira)(((_c = b.pricingSnapshot) === null || _c === void 0 ? void 0 : _c.estimatedTotalMinor) || 0),
+                    createdAt: b.createdAt,
+                });
+            }),
+        });
+    }
+    catch (error) {
+        console.error("Get Chef Bookings Error:", error);
+        return res.status(500).json({ success: false, message: "Error fetching bookings", error });
+    }
+});
+exports.getChefBookings = getChefBookings;
 // ✅ Update Chef (Admin OR Chef owner)
 const updateChef = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
@@ -416,53 +413,65 @@ const updateChef = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         /**
          * ✅ Whitelisted fields
          * Prevent updating sensitive fields like password, isActive, staffId, etc.
+         * (password intentionally excluded — password changes must go through the
+         * dedicated OTP flow so they're hashed correctly)
          */
-        const allowedUpdates = [
-            "name",
-            "gender",
-            "email",
+        const topLevelUpdates = ["gender", "email", "profilePic", "dob", "phoneNumber"];
+        const chefDetailUpdates = [
             "bio",
             "specialties",
-            "category",
-            "phoneNumber",
-            "location",
-            "state",
-            "stateId",
+            "rating",
             "staffId",
-            "profilePic",
-            "dob",
             "yearsOfExperience",
-            "password",
-            "rating"
+            "chefLevel",
         ];
+        const addressUpdates = ["stateId", "stateName", "city"];
         const updates = {};
-        for (const key of allowedUpdates) {
+        if (req.body.name !== undefined) {
+            updates.fullName = req.body.name;
+        }
+        for (const key of topLevelUpdates) {
             if (req.body[key] !== undefined) {
                 updates[key] = req.body[key];
             }
         }
-        // ✅ If category is updated, also update categoryName
-        if (updates.category) {
-            if (!mongoose_1.default.Types.ObjectId.isValid(updates.category)) {
-                return res.status(400).json({ success: false, message: "Invalid category ID" });
-            }
-            const category = yield Category_1.default.findById(updates.category).select("name");
-            if (!category) {
-                return res.status(404).json({ success: false, message: "Category not found" });
-            }
-            updates.categoryName = category.name;
+        // ✅ Picture upload (multer-s3) takes precedence over any profilePic string in the body
+        const chefPic = req.file;
+        if (chefPic) {
+            updates.profilePic = chefPic.location || chefPic.path;
         }
-        const chef = yield Chef_1.default.findByIdAndUpdate(id, updates, {
+        for (const key of chefDetailUpdates) {
+            if (req.body[key] !== undefined) {
+                updates[`chefDetails.${key}`] = req.body[key];
+            }
+        }
+        for (const key of addressUpdates) {
+            if (req.body[key] !== undefined) {
+                updates[`address.${key}`] = req.body[key];
+            }
+        }
+        const chef = yield User_model_1.default.findOneAndUpdate({ _id: id, userType: "Chef" }, updates, {
             new: true,
             runValidators: true,
-        }).populate("category", "name").select("-password");
+        }).select("-password");
         if (!chef) {
             return res.status(404).json({ success: false, message: "Chef not found" });
         }
+        // Services offered live in the ChefService collection (see createChef) —
+        // reconcile it here too, otherwise edits to "services offered" are silently dropped.
+        const { serviceId, serviceIds } = req.body;
+        const nextServiceIds = Array.isArray(serviceIds) ?
+            serviceIds :
+            serviceId ? [serviceId] : undefined;
+        if (nextServiceIds !== undefined) {
+            yield ChefService_1.ChefService.deleteMany({ chefId: chef._id, serviceId: { $nin: nextServiceIds } });
+            yield Promise.allSettled(nextServiceIds.map((sid) => ChefService_1.ChefService.updateOne({ chefId: chef._id, serviceId: sid }, { $set: { isAvailable: true } }, { upsert: true })));
+        }
+        const [payload] = yield attachServicesOffered([chef]);
         return res.status(200).json({
             success: true,
             message: "Chef updated successfully",
-            payload: chef,
+            payload,
         });
     }
     catch (error) {
@@ -475,10 +484,63 @@ const updateChef = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
     }
 });
 exports.updateChef = updateChef;
+// ✅ Update chef approval status (ADMIN only)
+const updateChefStatus = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { id } = req.params;
+        const { status } = req.body;
+        if (!mongoose_1.default.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ success: false, message: "Invalid chef ID" });
+        }
+        const allowedStatuses = ["pending", "approved", "suspended", "rejected"];
+        if (!status || !allowedStatuses.includes(status)) {
+            return res.status(400).json({ success: false, message: "Invalid status" });
+        }
+        const chef = yield User_model_1.default.findOne({ _id: id, userType: "Chef" });
+        if (!chef) {
+            return res.status(404).json({ success: false, message: "Chef not found" });
+        }
+        const isApproving = status === "approved";
+        chef.isActive = isApproving;
+        // Only issue a fresh verification link the first time a chef is approved —
+        // a chef reinstated after suspension has already verified their email.
+        const needsVerificationEmail = isApproving && !chef.isEmailVerified;
+        if (needsVerificationEmail) {
+            chef.emailVerificationOtp = (0, auth_service_1.generateEmailVerificationOtp)();
+        }
+        yield chef.save();
+        if (needsVerificationEmail) {
+            try {
+                const verifyUrl = `${process.env.CLIENT_URL}/verify-email?email=${encodeURIComponent(chef.email)}&otp=${encodeURIComponent(chef.emailVerificationOtp || "")}`;
+                yield (0, chefsEmailNotification_1.sendChefApprovedEmail)({
+                    firstName: chef.firstName,
+                    email: chef.email,
+                    verifyUrl,
+                });
+            }
+            catch (error) {
+                console.error("Failed to send chef approval email:", error);
+            }
+        }
+        const payload = yield User_model_1.default.findById(chef._id)
+            .select("-password")
+            .populate("chefDetails.chefLevel", "name description");
+        return res.status(200).json({
+            success: true,
+            message: "Chef status updated",
+            payload,
+        });
+    }
+    catch (error) {
+        console.error("Update Chef Status Error:", error);
+        return res.status(500).json({ success: false, message: "Error updating chef status", error });
+    }
+});
+exports.updateChefStatus = updateChefStatus;
 // ✅ Disable Chef (ADMIN only)
 const disableChef = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const chef = yield Chef_1.default.findByIdAndUpdate(req.params.id, { isActive: false }, { new: true });
+        const chef = yield User_model_1.default.findOneAndUpdate({ _id: req.params.id, userType: "Chef" }, { isActive: false }, { new: true });
         if (!chef) {
             return res.status(404).json({ message: "Chef not found" });
         }
@@ -495,7 +557,7 @@ exports.disableChef = disableChef;
 // ✅ Delete Chef (ADMIN only)
 const deleteChef = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const chef = yield Chef_1.default.findByIdAndDelete(req.params.id);
+        const chef = yield User_model_1.default.findOneAndDelete({ _id: req.params.id, userType: "Chef" });
         if (!chef) {
             return res.status(404).json({ message: "Chef not found" });
         }

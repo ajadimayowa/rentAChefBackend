@@ -12,6 +12,7 @@ const chef_controller_1 = require("../controllers/chef.controller");
 const isAdmin_1 = require("../middleware/isAdmin");
 const router = (0, express_1.Router)();
 router.get('/user/dashboard/:id', auth_middleware_1.verifyUserToken, user_controller_1.getUserDashboard);
+router.get('/user/bookings/:id', auth_middleware_1.verifyUserToken, user_controller_1.getUserBookings);
 router.get('/user/users', isAdmin_1.isAdmin, user_controller_1.getAllUsers);
 router.get('/user/:id', auth_middleware_1.verifyUserToken, user_controller_1.getUserById);
 router.put('/user/uploadProfilePic/:id', auth_middleware_1.verifyUserToken, upload_1.default.single('profilePic'), user_controller_1.updateProfilePic);

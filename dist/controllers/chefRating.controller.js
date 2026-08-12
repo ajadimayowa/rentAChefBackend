@@ -14,7 +14,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getChefRatings = exports.addOrUpdateChefRating = void 0;
 const ChefRating_1 = require("../models/ChefRating");
-const Chef_1 = __importDefault(require("../models/Chef"));
+const User_model_1 = __importDefault(require("../models/User.model"));
 const Booking_1 = require("../models/Booking");
 const addOrUpdateChefRating = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
@@ -23,7 +23,7 @@ const addOrUpdateChefRating = (req, res) => __awaiter(void 0, void 0, void 0, fu
             return res.status(401).json({ success: false, message: 'Unauthorized' });
         const { chefId } = req.params;
         const { rating, review, bookingId } = req.body;
-        const chef = yield Chef_1.default.findById(chefId);
+        const chef = yield User_model_1.default.findOne({ _id: chefId, userType: 'Chef' });
         if (!chef)
             return res.status(404).json({ success: false, message: 'Chef not found' });
         if (!bookingId)
@@ -52,7 +52,7 @@ const addOrUpdateChefRating = (req, res) => __awaiter(void 0, void 0, void 0, fu
         try {
             const all = yield ChefRating_1.ChefRating.find({ chefId });
             const avg = all.length ? all.reduce((s, x) => s + x.rating, 0) / all.length : 0;
-            yield Chef_1.default.findByIdAndUpdate(chefId, { rating: avg });
+            yield User_model_1.default.findByIdAndUpdate(chefId, { rating: avg });
         }
         catch (e) {
             console.warn('Failed to update chef average rating:', e);

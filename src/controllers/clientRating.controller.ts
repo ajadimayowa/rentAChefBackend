@@ -18,7 +18,7 @@ export const addOrUpdateClientRating = async (req: Request, res: Response): Prom
 
     // Ensure actor is the chef for this booking (if actor is Chef)
     const actorId = (actor as any)._id?.toString?.() || (actor as any).id;
-    if (booking.chefId && booking.chefId.toString() !== actorId && !(actor as any).isAdmin) {
+    if (booking.chefId && booking.chefId.toString() !== actorId && (actor as any).userType !== 'Admin') {
       return res.status(403).json({ success: false, message: 'You can only rate clients for your bookings' });
     }
 
@@ -56,7 +56,7 @@ export const addOrUpdateClientRating = async (req: Request, res: Response): Prom
 export const getClientRatings = async (req: Request, res: Response) => {
   try {
     const { clientId } = req.params;
-    const items = await ClientRating.find({ clientId }).populate('chefId', 'name profilePic');
+    const items = await ClientRating.find({ clientId }).populate('chefId', 'fullName profilePic');
     const avg = items.length ? items.reduce((s, r) => s + r.rating, 0) / items.length : 0;
     res.status(200).json({ success: true, payload: { average: avg, total: items.length, items } });
   } catch (error: any) {

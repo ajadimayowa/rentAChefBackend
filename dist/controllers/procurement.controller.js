@@ -17,6 +17,9 @@ const Procurement_1 = __importDefault(require("../models/Procurement"));
 const axios_1 = __importDefault(require("axios"));
 const Booking_1 = require("../models/Booking");
 const Notification_1 = __importDefault(require("../models/Notification"));
+const User_model_1 = __importDefault(require("../models/User.model"));
+const bookingEmailNotifications_1 = require("../services/email/rentAChef/bookingEmailNotifications");
+const firstNameOf = (fullName) => (fullName || 'there').trim().split(' ')[0];
 const createProcurement = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { bookingId, items, isProcurementPaid, paymentChannel, paymentReference } = req.body;
@@ -49,6 +52,18 @@ const createProcurement = (req, res) => __awaiter(void 0, void 0, void 0, functi
         }
         catch (err) {
             console.error('Failed to create notification for procurement creation', err);
+        }
+        if (booking.customerId) {
+            const customer = yield User_model_1.default.findById(booking.customerId).select('fullName email');
+            if (customer === null || customer === void 0 ? void 0 : customer.email) {
+                yield (0, bookingEmailNotifications_1.sendBookingNotificationEmail)({
+                    firstName: firstNameOf(customer.fullName),
+                    email: customer.email,
+                    heading: 'Procurement added to your booking',
+                    message: `Additional procurement items were added to your booking. Total cost: ${procurement.totalCost}.`,
+                    bookingNumber: booking.bookingNumber,
+                });
+            }
         }
         return res.status(201).json({ success: true, payload: procurement });
     }
@@ -199,7 +214,7 @@ const markProcurementPaid = (req, res) => __awaiter(void 0, void 0, void 0, func
         // If channel is transfer, only admins should be allowed to mark paid.
         const requester = req.user;
         if (paymentChannel === 'transfer') {
-            if (!requester || !requester.isAdmin) {
+            if (!requester || requester.userType !== 'Admin') {
                 return res.status(403).json({ success: false, message: 'Only admins can mark transfer payments as paid' });
             }
             procurement.isProcurementPaid = true;

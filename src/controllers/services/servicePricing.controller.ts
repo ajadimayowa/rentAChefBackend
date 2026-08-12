@@ -163,7 +163,7 @@ export const getServicePricings = async (req: Request, res: Response):Promise<an
 
     const servicePricings = await ServicePricing.find(filters)
       .populate("serviceId", "name code")
-      .populate("specialServiceId", "name slug description")
+      .populate("specialServiceId", "title description")
       .populate("chefCategoryId", "name slug description tasks")
       .sort({ createdAt: -1 });
 
@@ -185,7 +185,7 @@ export const getServicePricingById = async (req: Request, res: Response):Promise
 
     const servicePricing = await ServicePricing.findById(id)
       .populate("serviceId", "name code")
-      .populate("specialServiceId", "name slug")
+      .populate("specialServiceId", "title description")
       .populate("chefCategoryId", "name slug");
 
     if (!servicePricing) {

@@ -11,7 +11,7 @@ import {
 } from "../controllers/category/category.controller";
 import { addServiceToCategory } from "../controllers/category/category.service.controller";
 import uploadAdImages from "../middleware/upload";
-import { adminAuth } from "../middleware/adminAuth";
+import { requireAdminAuth } from "../middleware/auth/adminAuth.middleware";
 
 const router = Router();
 
@@ -37,7 +37,7 @@ const router = Router();
  *             schema:
  *               $ref: '#/components/schemas/Category'
  */
-router.post("/category/create",adminAuth,uploadAdImages.single("catPic"), createCategory);
+router.post("/category/create",requireAdminAuth,uploadAdImages.single("catPic"), createCategory);
 // router.post("/chef/register",adminAuth, createChef);
 /**
  * @openapi

@@ -7,5 +7,5 @@ const router = (0, express_1.Router)();
 // Route to get all states
 router.get('/states/get-states', stateController_1.getStates);
 // Route to get local governments by state ID
-router.get('states/lga/:stateId', stateController_1.getLocalGovernments);
+router.get('/states/lga/:stateId', stateController_1.getLocalGovernments);
 exports.default = router;

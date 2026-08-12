@@ -35,23 +35,40 @@ const swaggerDefinition = {
             },
             AuthRegisterRequest: {
                 type: "object",
+                required: ["email", "password", "fullName", "phoneNumber"],
                 properties: {
-                    email: { type: "string", format: "email" },
-                    password: { type: "string", format: "password" },
-                    firstName: { type: "string" },
-                    lastName: { type: "string" },
-                    phone: { type: "string" },
+                    email: { type: "string", format: "email", example: "customer@example.com" },
+                    password: { type: "string", format: "password", example: "Str0ngPass!" },
+                    fullName: { type: "string", example: "Ada Okafor" },
+                    phoneNumber: { type: "string", example: "+2348012345678" },
+                },
+            },
+            AuthRegisterResponse: {
+                type: "object",
+                properties: {
+                    success: { type: "boolean", example: true },
+                    payload: {
+                        type: "object",
+                        properties: {
+                            id: { type: "string" },
+                            email: { type: "string", format: "email" },
+                            fullName: { type: "string" },
+                            userType: { type: "string", enum: ["Customer", "Chef", "Admin"], example: "Customer" },
+                        },
+                    },
                 },
             },
             AuthVerifyEmailRequest: {
                 type: "object",
+                required: ["email", "otp"],
                 properties: {
                     email: { type: "string", format: "email" },
-                    otp: { type: "string" },
+                    otp: { type: "string", example: "482913" },
                 },
             },
             AuthLoginRequest: {
                 type: "object",
+                required: ["email", "password"],
                 properties: {
                     email: { type: "string", format: "email" },
                     password: { type: "string", format: "password" },
@@ -59,40 +76,142 @@ const swaggerDefinition = {
             },
             AuthVerifyLoginOtpRequest: {
                 type: "object",
+                required: ["email", "otp"],
                 properties: {
                     email: { type: "string", format: "email" },
-                    otp: { type: "string" },
+                    otp: { type: "string", example: "482913" },
                 },
             },
             AuthPasswordResetRequest: {
                 type: "object",
+                required: ["email"],
                 properties: {
                     email: { type: "string", format: "email" },
                 },
             },
             AuthResetWithOtpRequest: {
                 type: "object",
+                required: ["email", "otp", "newPassword"],
                 properties: {
                     email: { type: "string", format: "email" },
-                    otp: { type: "string" },
+                    otp: { type: "string", example: "482913" },
                     newPassword: { type: "string", format: "password" },
                 },
             },
             AuthResendOtpRequest: {
                 type: "object",
+                required: ["email"],
                 properties: {
                     email: { type: "string", format: "email" },
                 },
             },
-            AuthResponse: {
+            MessageResponse: {
                 type: "object",
                 properties: {
+                    success: { type: "boolean", example: true },
+                    message: { type: "string", example: "Request completed successfully" },
+                },
+            },
+            CustomerLoginOtpResponse: {
+                type: "object",
+                description: "Returned by /auth/login — a login OTP has been sent, no token yet. Exchange it via /auth/verify-loginOtp.",
+                properties: {
+                    success: { type: "boolean", example: true },
+                    message: { type: "string", example: "OTP sent to phone." },
+                    payload: {
+                        type: "object",
+                        properties: {
+                            email: { type: "string", format: "email" },
+                            expiresAt: { type: "string", format: "date-time" },
+                        },
+                    },
+                },
+            },
+            CustomerAuthResponse: {
+                type: "object",
+                description: "Returned by /auth/verify-loginOtp once the login OTP has been confirmed.",
+                properties: {
+                    success: { type: "boolean", example: true },
+                    message: { type: "string", example: "Login OTP verified successfully." },
                     token: { type: "string" },
-                    user: { $ref: "#/components/schemas/UserProfile" },
+                    payload: {
+                        type: "object",
+                        properties: {
+                            id: { type: "string" },
+                            email: { type: "string", format: "email" },
+                            fullName: { type: "string" },
+                            userType: { type: "string", example: "Customer" },
+                        },
+                    },
+                },
+            },
+            ChefAuthResponse: {
+                type: "object",
+                description: "Returned by /auth/chef/login. Chef login is single-step: password in, token out.",
+                properties: {
+                    message: { type: "string", example: "Login successful" },
+                    token: { type: "string" },
+                    chef: {
+                        type: "object",
+                        properties: {
+                            id: { type: "string" },
+                            staffId: { type: "string" },
+                            name: { type: "string" },
+                            email: { type: "string", format: "email" },
+                            isPasswordUpdated: { type: "boolean" },
+                        },
+                    },
+                },
+            },
+            AdminAuthResponse: {
+                type: "object",
+                description: "Returned by /admin/login. Admin login is single-step and also bootstraps category/service pickers for the dashboard.",
+                properties: {
+                    success: { type: "boolean", example: true },
+                    message: { type: "string", example: "Login successful" },
+                    token: { type: "string" },
+                    payload: {
+                        type: "object",
+                        properties: {
+                            id: { type: "string" },
+                            fullName: { type: "string" },
+                            email: { type: "string", format: "email" },
+                            role: { type: "string", enum: ["super_admin", "admin"] },
+                            formattedCategories: {
+                                type: "array",
+                                items: {
+                                    type: "object",
+                                    properties: { label: { type: "string" }, value: { type: "string" } },
+                                },
+                            },
+                            formattedServices: {
+                                type: "array",
+                                items: {
+                                    type: "object",
+                                    properties: { name: { type: "string" }, id: { type: "string" } },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+            WhoamiResponse: {
+                type: "object",
+                description: "Returned by /auth/me for any authenticated userType (Customer, Chef or Admin).",
+                properties: {
+                    success: { type: "boolean", example: true },
+                    payload: {
+                        type: "object",
+                        properties: {
+                            role: { type: "string", example: "customer" },
+                            user: { $ref: "#/components/schemas/UserProfile" },
+                        },
+                    },
                 },
             },
             AdminLoginRequest: {
                 type: "object",
+                required: ["email", "password"],
                 properties: {
                     email: { type: "string", format: "email" },
                     password: { type: "string", format: "password" },
@@ -100,22 +219,22 @@ const swaggerDefinition = {
             },
             AdminCreateRequest: {
                 type: "object",
+                required: ["fullName", "email", "password"],
                 properties: {
+                    fullName: { type: "string", example: "Jane Doe" },
                     email: { type: "string", format: "email" },
                     password: { type: "string", format: "password" },
-                    firstName: { type: "string" },
-                    lastName: { type: "string" },
-                    role: { type: "string" },
+                    role: { type: "string", enum: ["super_admin", "admin"], description: "Defaults to 'admin' if omitted" },
                 },
             },
             AdminProfile: {
                 type: "object",
                 properties: {
                     id: { type: "string" },
+                    fullName: { type: "string" },
                     email: { type: "string", format: "email" },
-                    firstName: { type: "string" },
-                    lastName: { type: "string" },
-                    role: { type: "string" },
+                    role: { type: "string", enum: ["super_admin", "admin"] },
+                    isActive: { type: "boolean" },
                 },
             },
             AdminDashboard: {
@@ -142,13 +261,47 @@ const swaggerDefinition = {
                 type: "object",
                 properties: {
                     id: { type: "string" },
-                    firstName: { type: "string" },
-                    lastName: { type: "string" },
+                    fullName: { type: "string" },
                     email: { type: "string", format: "email" },
-                    phone: { type: "string" },
-                    bio: { type: "string" },
-                    chefPic: { type: "string" },
+                    phoneNumber: { type: "string" },
+                    gender: { type: "string", enum: ["Male", "Female"] },
+                    dob: { type: "string", format: "date" },
+                    profilePic: { type: "string", description: "Public URL of the chef's uploaded picture" },
                     isActive: { type: "boolean" },
+                    address: {
+                        type: "object",
+                        properties: {
+                            stateId: { type: "string" },
+                            stateName: { type: "string" },
+                            city: { type: "string" },
+                        },
+                    },
+                    chefDetails: {
+                        type: "object",
+                        properties: {
+                            staffId: { type: "string" },
+                            rating: { type: "number" },
+                            bio: { type: "string" },
+                            specialties: { type: "array", items: { type: "string" } },
+                            yearsOfExperience: { type: "number" },
+                            chefLevel: {
+                                type: "object",
+                                description: "Populated from the referenced Category",
+                                properties: {
+                                    id: { type: "string" },
+                                    name: { type: "string" },
+                                    description: { type: "string" },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+            ChefLevel: {
+                type: "object",
+                properties: {
+                    id: { type: "string" },
+                    name: { type: "string", example: "Premium" },
                 },
             },
             ChefLoginRequest: {
@@ -160,23 +313,51 @@ const swaggerDefinition = {
             },
             ChefCreateRequest: {
                 type: "object",
+                required: ["name", "email", "city", "stateId", "phone"],
                 properties: {
-                    firstName: { type: "string" },
-                    lastName: { type: "string" },
-                    email: { type: "string", format: "email" },
-                    phone: { type: "string" },
+                    name: { type: "string", example: "Ada Okafor" },
+                    gender: { type: "string", enum: ["Male", "Female"], example: "Female" },
+                    email: { type: "string", format: "email", example: "chef@example.com" },
+                    phone: { type: "string", example: "+2348012345678" },
+                    dob: { type: "string", format: "date" },
                     bio: { type: "string" },
-                    chefPic: { type: "string", format: "binary" },
+                    specialties: {
+                        type: "array",
+                        items: { type: "string" },
+                        description: "Repeat the field for each value, e.g. specialties[]=Pastry&specialties[]=Grill",
+                    },
+                    city: { type: "string" },
+                    stateId: { type: "string" },
+                    stateName: { type: "string" },
+                    yearsOfExperience: { type: "number" },
+                    chefLevel: { type: "string", description: "ChefLevel id, from GET /chef/levels" },
+                    defaultPassword: { type: "string", format: "password", description: "Defaults to Chef@123 if omitted" },
+                    serviceIds: {
+                        type: "array",
+                        items: { type: "string" },
+                        description: "Optional ChefService ids to attach on creation",
+                    },
+                    chefPic: { type: "string", format: "binary", description: "Chef profile picture" },
                 },
             },
             ChefUpdateRequest: {
                 type: "object",
                 properties: {
-                    firstName: { type: "string" },
-                    lastName: { type: "string" },
-                    phone: { type: "string" },
+                    name: { type: "string" },
+                    gender: { type: "string", enum: ["Male", "Female"] },
+                    email: { type: "string", format: "email" },
+                    dob: { type: "string", format: "date" },
+                    rating: { type: "number" },
                     bio: { type: "string" },
-                    chefPic: { type: "string", format: "binary" },
+                    specialties: { type: "array", items: { type: "string" } },
+                    phoneNumber: { type: "string" },
+                    stateId: { type: "string" },
+                    stateName: { type: "string" },
+                    city: { type: "string" },
+                    staffId: { type: "string" },
+                    yearsOfExperience: { type: "number" },
+                    chefLevel: { type: "string", description: "ChefLevel id, from GET /chef/levels" },
+                    chefPic: { type: "string", format: "binary", description: "New chef profile picture" },
                 },
             },
             Category: {
@@ -1431,7 +1612,7 @@ const swaggerDefinition = {
 };
 const options = {
     definition: swaggerDefinition,
-    apis: ["./src/routes/*.ts", "./src/controllers/*.ts", "./src/platform/**/*.ts"],
+    apis: ["./src/routes/**/*.ts", "./src/controllers/**/*.ts", "./src/platform/**/*.ts"],
 };
 const swaggerSpec = (0, swagger_jsdoc_1.default)(options);
 exports.default = swaggerSpec;

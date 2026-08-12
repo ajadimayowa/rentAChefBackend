@@ -19,7 +19,7 @@ const getRequestUser = (req) => req.user;
 const isAdminUser = (user) => {
     if (!user)
         return false;
-    return user.isAdmin === true || user.role === "ADMIN";
+    return user.userType === "Admin";
 };
 // CREATE QUOTE
 const createQuote = (req, res) => __awaiter(void 0, void 0, void 0, function* () {

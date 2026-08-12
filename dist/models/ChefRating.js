@@ -4,7 +4,7 @@ exports.ChefRating = void 0;
 const mongoose_1 = require("mongoose");
 const ChefRatingSchema = new mongoose_1.Schema({
     userId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'User', required: true },
-    chefId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Chef', required: true },
+    chefId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'User', required: true },
     bookingId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Booking', required: true },
     rating: { type: Number, required: true, min: 1, max: 5 },
     review: { type: String },

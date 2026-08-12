@@ -7,8 +7,9 @@
     "dev": "nodemon --exec ts-node src/index.ts",
     "seed:permissions": "ts-node src/seeders/permissions.seeder.ts",
     "sync:indexes:servicePricing": "ts-node src/seeders/syncServicePricingIndexes.ts",
+    "seed:superadmin": "ts-node src/seeders/seedSuperAdmin.ts",
     "build": "tsc && npm run copy:templates",
-    "copy:templates": "copyfiles -u 1 src/services/email/emailTemps/*.hbs dist/services/email/emailTemps",
+    "copy:templates": "copyfiles -u 4 \"src/services/email/emailTemps/**/*.hbs\" dist/services/email/emailTemps",
     "start": "node dist/index.js"
   },
   "engines": {

@@ -7,7 +7,7 @@ const express_1 = require("express");
 const category_controller_1 = require("../controllers/category/category.controller");
 const category_service_controller_1 = require("../controllers/category/category.service.controller");
 const upload_1 = __importDefault(require("../middleware/upload"));
-const adminAuth_1 = require("../middleware/adminAuth");
+const adminAuth_middleware_1 = require("../middleware/auth/adminAuth.middleware");
 const router = (0, express_1.Router)();
 // Category CRUD
 /**
@@ -31,7 +31,7 @@ const router = (0, express_1.Router)();
  *             schema:
  *               $ref: '#/components/schemas/Category'
  */
-router.post("/category/create", adminAuth_1.adminAuth, upload_1.default.single("catPic"), category_controller_1.createCategory);
+router.post("/category/create", adminAuth_middleware_1.requireAdminAuth, upload_1.default.single("catPic"), category_controller_1.createCategory);
 // router.post("/chef/register",adminAuth, createChef);
 /**
  * @openapi

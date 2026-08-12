@@ -124,7 +124,7 @@ const Menu = new mongoose_1.Schema({
     },
     chefId: {
         type: mongoose_1.Schema.Types.ObjectId,
-        ref: "Chef",
+        ref: "User",
         required: function () {
             return this.menuCreatorType === "chef";
         },

@@ -12,7 +12,7 @@ export interface IChefRating extends Document {
 const ChefRatingSchema = new Schema<IChefRating>(
   {
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-    chefId: { type: Schema.Types.ObjectId, ref: 'Chef', required: true },
+    chefId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     bookingId: { type: Schema.Types.ObjectId, ref: 'Booking', required: true },
     rating: { type: Number, required: true, min: 1, max: 5 },
     review: { type: String },

@@ -31,7 +31,7 @@ const addOrUpdateClientRating = (req, res) => __awaiter(void 0, void 0, void 0, 
             return res.status(404).json({ success: false, message: 'Booking not found' });
         // Ensure actor is the chef for this booking (if actor is Chef)
         const actorId = ((_b = (_a = actor._id) === null || _a === void 0 ? void 0 : _a.toString) === null || _b === void 0 ? void 0 : _b.call(_a)) || actor.id;
-        if (booking.chefId && booking.chefId.toString() !== actorId && !actor.isAdmin) {
+        if (booking.chefId && booking.chefId.toString() !== actorId && actor.userType !== 'Admin') {
             return res.status(403).json({ success: false, message: 'You can only rate clients for your bookings' });
         }
         if (booking.status !== 'Completed') {
@@ -61,7 +61,7 @@ exports.addOrUpdateClientRating = addOrUpdateClientRating;
 const getClientRatings = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { clientId } = req.params;
-        const items = yield ClientRating_1.ClientRating.find({ clientId }).populate('chefId', 'name profilePic');
+        const items = yield ClientRating_1.ClientRating.find({ clientId }).populate('chefId', 'fullName profilePic');
         const avg = items.length ? items.reduce((s, r) => s + r.rating, 0) / items.length : 0;
         res.status(200).json({ success: true, payload: { average: avg, total: items.length, items } });
     }

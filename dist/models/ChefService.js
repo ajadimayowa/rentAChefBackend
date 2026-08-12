@@ -4,7 +4,7 @@ exports.ChefService = void 0;
 // models/ChefService.ts
 const mongoose_1 = require("mongoose");
 const ChefServiceSchema = new mongoose_1.Schema({
-    chefId: { type: mongoose_1.Schema.Types.ObjectId, ref: "Chef", required: true },
+    chefId: { type: mongoose_1.Schema.Types.ObjectId, ref: "User", required: true },
     serviceId: { type: mongoose_1.Schema.Types.ObjectId, ref: "Service", required: true },
     isAvailable: { type: Boolean, default: true },
 }, {

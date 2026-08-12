@@ -9,12 +9,12 @@ import {
 } from '../controllers/notification.controller';
 import { verifyUserToken } from '../middleware/auth.middleware';
 import { isAdmin } from '../middleware/isAdmin';
-import { adminAuth } from '../middleware/adminAuth';
+import { requireAdminAuth } from '../middleware/auth/adminAuth.middleware';
 
 const router = Router();
 
 // Create notification (protected)
-router.post('/notification/create', adminAuth, createNotification);
+router.post('/notification/create', requireAdminAuth, createNotification);
 
 // Get notifications for user (public read) - requires `userId` query param or authenticated user
 router.get('/notifications', getNotifications);

@@ -38,6 +38,7 @@ export enum BookingType {
 export enum ModeOfPayment {
   PAYSTACK = 'Paystack',
   TRANSFER = 'Transfer',
+  CASH = 'Cash',
   UNPAID = 'Unpaid',
 }
 
