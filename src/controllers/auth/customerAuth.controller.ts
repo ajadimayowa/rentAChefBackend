@@ -26,6 +26,9 @@ export const register = async (req: Request, res: Response): Promise<any> => {
     }
 
     try {
+      // Customers can register from the mobile app or the web, so the emailed
+      // link opens the web verification page (works from any device/client);
+      // that page also offers an "open in app" deep link for mobile users.
       const verifyUrl = `${process.env.CLIENT_URL}/verify-email?email=${encodeURIComponent(user.email)}&otp=${encodeURIComponent(emailVerificationOtp)}`;
       await sendWelcomeEmail({
         firstName: user.firstName || '',
