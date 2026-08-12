@@ -11,7 +11,7 @@ const morgan_1 = __importDefault(require("morgan"));
 const swagger_ui_express_1 = __importDefault(require("swagger-ui-express"));
 const swagger_1 = __importDefault(require("./docs/swagger"));
 const stateRoutes_1 = __importDefault(require("./routes/stateRoutes"));
-const auth_routes_1 = __importDefault(require("./routes/auth.routes"));
+const auth_1 = __importDefault(require("./routes/auth"));
 const admin_routes_1 = __importDefault(require("./routes/admin.routes"));
 const chef_route_1 = __importDefault(require("./routes/chef.route"));
 const category_routes_1 = __importDefault(require("./routes/category.routes"));
@@ -35,12 +35,16 @@ const booking_routes_1 = __importDefault(require("./routes/booking.routes"));
 const package_routes_1 = __importDefault(require("./routes/package.routes"));
 const menuTypes_routes_1 = __importDefault(require("./routes/menuTypes.routes"));
 const assignedBookingNumber_routes_1 = __importDefault(require("./routes/assignedBookingNumber.routes"));
+const emailService_1 = require("./services/email/emailService");
 dotenv_1.default.config();
 // Connect to DB
 (0, db_1.default)().catch((err) => {
     console.error('Failed to connect to DB:', err.message);
     process.exit(1);
 });
+// Non-fatal: logs clearly at boot if SMTP auth/connectivity is broken instead of
+// only surfacing as a failed send later.
+(0, emailService_1.verifyEmailTransport)();
 const app = (0, express_1.default)();
 // Middlewares
 if (process.env.NODE_ENV === 'development')
@@ -54,7 +58,7 @@ app.use(express_1.default.urlencoded({ extended: true }));
 const apiPrefix = '/api/v1/';
 app.use('/api-docs', swagger_ui_express_1.default.serve, swagger_ui_express_1.default.setup(swagger_1.default));
 // Routes
-app.use(apiPrefix, auth_routes_1.default);
+app.use(apiPrefix, auth_1.default);
 app.use(apiPrefix, admin_routes_1.default);
 app.use(apiPrefix, chef_route_1.default);
 app.use(apiPrefix, category_routes_1.default);

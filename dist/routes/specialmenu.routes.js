@@ -4,7 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
-const adminAuth_1 = require("../middleware/adminAuth");
+const adminAuth_middleware_1 = require("../middleware/auth/adminAuth.middleware");
 const upload_1 = __importDefault(require("../middleware/upload"));
 const specialMenu_controller_1 = require("../controllers/specialMenu.controller");
 // optional: protect with admin/chef middleware
@@ -138,7 +138,7 @@ router.get("/specialmenu/:id", specialMenu_controller_1.getSpecialMenuById);
  *             schema:
  *               $ref: '#/components/schemas/SpecialMenuResponse'
  */
-router.put("/specialmenu/:id", adminAuth_1.adminAuth, upload_1.default.single("menuPic"), specialMenu_controller_1.updateSpecialMenu);
+router.put("/specialmenu/:id", adminAuth_middleware_1.requireAdminAuth, upload_1.default.single("menuPic"), specialMenu_controller_1.updateSpecialMenu);
 /**
  * @openapi
  * /specialmenu/{id}:
@@ -162,7 +162,7 @@ router.put("/specialmenu/:id", adminAuth_1.adminAuth, upload_1.default.single("m
  *             schema:
  *               $ref: '#/components/schemas/SpecialMenuDeleteResponse'
  */
-router.delete("/specialmenu/:id", adminAuth_1.adminAuth, specialMenu_controller_1.deleteSpecialMenu);
+router.delete("/specialmenu/:id", adminAuth_middleware_1.requireAdminAuth, specialMenu_controller_1.deleteSpecialMenu);
 /**
  * @openapi
  * /specialmenu/{menuId}/procurement:
@@ -192,6 +192,6 @@ router.delete("/specialmenu/:id", adminAuth_1.adminAuth, specialMenu_controller_
  *             schema:
  *               $ref: '#/components/schemas/SpecialMenuResponse'
  */
-router.post("/specialmenu/:menuId/procurement", adminAuth_1.adminAuth, specialMenu_controller_1.addProcurements);
+router.post("/specialmenu/:menuId/procurement", adminAuth_middleware_1.requireAdminAuth, specialMenu_controller_1.addProcurements);
 // router.delete("/specialmenu/:menuId/procurement/:title", removeProcurementItem);
 exports.default = router;

@@ -1,10 +1,8 @@
 import { Router } from 'express';
 // import { register, login } from '../controllers/auth.controller';
 
-import { verifyToken, verifyUserToken } from '../middleware/auth.middleware';
-import { login, register, verifyEmail, verifyLoginOtp } from '../controllers/chefAuthControllers/auth.controller';
-import { completeKyc, getAllUsers, getUserById, getUserDashboard, updateBioData, updateHealthInformation, updateLocation, updateNok, updateProfilePic } from '../controllers/user/user.controller';
-import { adminAuth } from '../middleware/adminAuth';
+import { verifyUserToken } from '../middleware/auth.middleware';
+import { completeKyc, getAllUsers, getUserById, getUserBookings, getUserDashboard, updateBioData, updateHealthInformation, updateLocation, updateNok, updateProfilePic } from '../controllers/user/user.controller';
 import uploadAdImages from '../middleware/upload';
 import { checkChefAvailability } from '../controllers/chef.controller';
 import { isAdmin } from '../middleware/isAdmin';
@@ -12,6 +10,7 @@ import { isAdmin } from '../middleware/isAdmin';
 const router = Router();
 
 router.get('/user/dashboard/:id',verifyUserToken, getUserDashboard);
+router.get('/user/bookings/:id',verifyUserToken, getUserBookings);
 router.get('/user/users',isAdmin, getAllUsers);
 
 router.get('/user/:id',verifyUserToken, getUserById);

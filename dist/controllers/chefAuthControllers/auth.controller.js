@@ -19,7 +19,6 @@ const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const otpUtils_1 = require("../../utils/otpUtils");
 const usersEmailNotifs_1 = require("../../services/email/rentAChef/usersEmailNotifs");
-const Chef_1 = __importDefault(require("../../models/Chef"));
 const sendSms_1 = require("../../services/sms/sendSms");
 const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { email, password, fullName, phoneNumber } = req.body;
@@ -33,10 +32,19 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             return res.status(400).json({ success: false, message: 'A user with this email already exist.' });
         }
         let firstName = fullName.split(' ')[0];
-        const hashed = yield bcryptjs_1.default.hash(password, 10);
-        const isAdmin = req.body.adminSecret === process.env.ADMIN_SECRET;
+        const grantAdmin = req.body.adminSecret === process.env.ADMIN_SECRET;
         const emailVerificationOtp = (0, otpUtils_1.generateOtp)();
-        const user = yield User_model_1.default.create({ email: formatedEmail, phone: phoneNumber, emailVerificationOtp, password: hashed, fullName, firstName, isAdmin });
+        const user = yield User_model_1.default.create({
+            email: formatedEmail,
+            phone: phoneNumber,
+            password, // plaintext — pre-save hook hashes it
+            fullName,
+            firstName,
+            userType: grantAdmin ? 'Admin' : 'Customer',
+            isActive: true,
+            adminDetails: grantAdmin ? { role: 'admin' } : undefined,
+            customerDetails: { emailVerificationOtp },
+        });
         // console.log({ seeEmailVerOtp: emailVerificationOtp })
         // await sendEmailVerificationOtp({
         //   firstName,
@@ -46,7 +54,7 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         console.log({ seePhone: user.phone });
         try {
             yield (0, sendSms_1.sendSms)({
-                to: user.phone,
+                to: user.phone || '',
                 message: `Your RentAChef verification code is ${emailVerificationOtp}`,
             });
         }
@@ -55,7 +63,7 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             // decide whether to retry, notify, or continue
         }
         // const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'secret', { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
-        return res.status(201).json({ success: true, payload: { id: user._id, email: user.email, fullName: user.fullName, isAdmin: user.isAdmin } });
+        return res.status(201).json({ success: true, payload: { id: user._id, email: user.email, fullName: user.fullName, userType: user.userType } });
     }
     catch (error) {
         console.log(error);
@@ -67,6 +75,7 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
 });
 exports.register = register;
 const verifyEmail = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
     try {
         const { email, otp } = req.body;
         console.log({ email: email, otp: otp });
@@ -86,24 +95,23 @@ const verifyEmail = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             });
         }
         // Check if already verified
-        if (customer.isEmailVerified) {
+        if ((_a = customer.customerDetails) === null || _a === void 0 ? void 0 : _a.isEmailVerified) {
             return res.status(400).json({
                 success: false,
                 message: "Email already verified.",
             });
         }
         // Check if OTP matches
-        if (customer.emailVerificationOtp !== otp) {
+        if (((_b = customer.customerDetails) === null || _b === void 0 ? void 0 : _b.emailVerificationOtp) !== otp) {
             return res.status(400).json({
                 success: false,
                 message: "Invalid OTP.",
             });
         }
         // Update verification status
-        customer.isEmailVerified = true;
-        customer.emailVerificationOtp = "";
+        customer.customerDetails = Object.assign(Object.assign({}, customer.customerDetails), { isEmailVerified: true, emailVerificationOtp: "" });
         yield customer.save();
-        let firstName = customer === null || customer === void 0 ? void 0 : customer.firstName;
+        let firstName = (customer === null || customer === void 0 ? void 0 : customer.firstName) || '';
         yield (0, usersEmailNotifs_1.sendEmailVerificationSuccessEmail)({
             firstName,
             email,
@@ -123,6 +131,7 @@ const verifyEmail = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
 });
 exports.verifyEmail = verifyEmail;
 const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     // console.log('see me')
     try {
         const { email, password } = req.body;
@@ -147,7 +156,7 @@ const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             });
         }
         // Optional: ensure user has verified their email before logging in
-        if (!user.isEmailVerified) {
+        if (!((_a = user.customerDetails) === null || _a === void 0 ? void 0 : _a.isEmailVerified)) {
             return res.status(403).json({
                 success: false,
                 message: "Please verify your email before logging in.",
@@ -161,20 +170,21 @@ const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         yield user.save();
         console.log({ seeOtp: otp });
         // Send OTP via email
-        // try {
-        //   await sendLoginOtpEmail({
-        //     firstName: user.firstName,
-        //     email: user.email,
-        //     loginOtp: otp,
-        //   });
-        // } catch (error) {
-        //   console.error("Error sending OTP email:", error);
-        //   // Don't block login flow if email fails, just log it
-        // }
+        try {
+            yield (0, usersEmailNotifs_1.sendLoginOtpEmail)({
+                firstName: user.firstName || '',
+                email: user.email,
+                loginOtp: otp,
+            });
+        }
+        catch (error) {
+            console.error("Error sending OTP email:", error);
+            // Don't block login flow if email fails, just log it
+        }
         console.log({ seePhone: user.phone });
         try {
             yield (0, sendSms_1.sendSms)({
-                to: user.phone,
+                to: user.phone || '',
                 message: `Your RentAChef login OTP code is ${otp}`,
             });
         }
@@ -245,7 +255,7 @@ const verifyLoginOtp = (req, res) => __awaiter(void 0, void 0, void 0, function*
         customer.loginOtpExpires = new Date(0);
         yield customer.save();
         // Optionally generate a JWT token
-        const token = jsonwebtoken_1.default.sign({ id: customer._id, email: customer.email, isAdmin: customer.isAdmin }, process.env.JWT_SECRET, { expiresIn: "7d" });
+        const token = jsonwebtoken_1.default.sign({ id: customer._id, email: customer.email, userType: customer.userType }, process.env.JWT_SECRET, { expiresIn: "7d" });
         // Send OTP via email
         // try {
         //   await sendLoginSuccessEmail({
@@ -263,7 +273,7 @@ const verifyLoginOtp = (req, res) => __awaiter(void 0, void 0, void 0, function*
                 id: customer.id,
                 email: customer.email,
                 fullName: customer.fullName,
-                isAdmin: customer.isAdmin,
+                userType: customer.userType,
             },
         });
     }
@@ -309,7 +319,7 @@ const requestPasswordChangeOtp = (req, res) => __awaiter(void 0, void 0, void 0,
         console.log({ seePhone: user.phone });
         try {
             yield (0, sendSms_1.sendSms)({
-                to: user.phone,
+                to: user.phone || '',
                 message: `Your RentAChef Password reset code is ${otp}`,
             });
         }
@@ -346,8 +356,8 @@ const changePasswordWithOtp = (req, res) => __awaiter(void 0, void 0, void 0, fu
         if (user.loginOtpExpires < new Date()) {
             return res.status(400).json({ message: 'OTP expired' });
         }
-        const hashedPassword = yield bcryptjs_1.default.hash(newPassword, 10);
-        user.password = hashedPassword;
+        // Plaintext here — pre-save hook hashes it on save
+        user.password = newPassword;
         // clear otp
         user.loginOtp = undefined;
         user.loginOtpExpires = undefined;
@@ -386,7 +396,7 @@ const resendPasswordChangeOtp = (req, res) => __awaiter(void 0, void 0, void 0, 
         yield user.save();
         try {
             yield (0, usersEmailNotifs_1.sendPasswordChangeSuccessEmail)({
-                firstName: user.firstName,
+                firstName: user.firstName || '',
                 email: user.email,
             });
         }
@@ -404,6 +414,7 @@ const resendPasswordChangeOtp = (req, res) => __awaiter(void 0, void 0, void 0, 
 exports.resendPasswordChangeOtp = resendPasswordChangeOtp;
 //chef auths
 const chefLogin = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
     try {
         const { email, password } = req.body;
         // 1. Validate input
@@ -413,7 +424,7 @@ const chefLogin = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             });
         }
         // 2. Find chef by email
-        const chef = yield Chef_1.default.findOne({ email });
+        const chef = yield User_model_1.default.findOne({ email, userType: 'Chef' });
         if (!chef) {
             return res.status(404).json({
                 message: "Chef not found",
@@ -432,7 +443,7 @@ const chefLogin = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             });
         }
         // 5. Compare passwords
-        const isMatch = yield bcryptjs_1.default.compare(password, chef.password);
+        const isMatch = yield chef.comparePassword(password);
         if (!isMatch) {
             return res.status(401).json({
                 message: "Invalid login credentials",
@@ -450,10 +461,10 @@ const chefLogin = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             token,
             chef: {
                 id: chef._id,
-                staffId: chef.staffId,
-                name: chef.name,
+                staffId: (_a = chef.chefDetails) === null || _a === void 0 ? void 0 : _a.staffId,
+                name: chef.fullName,
                 email: chef.email,
-                isPasswordUpdated: chef.isPasswordUpdated,
+                isPasswordUpdated: (_b = chef.chefDetails) === null || _b === void 0 ? void 0 : _b.isPasswordUpdated,
             },
         });
     }

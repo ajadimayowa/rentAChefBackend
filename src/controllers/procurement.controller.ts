@@ -4,6 +4,10 @@ import axios from 'axios';
 import { Types } from 'mongoose';
 import { BookingModel } from '../models/Booking';
 import Notification from '../models/Notification';
+import User from '../models/User.model';
+import { sendBookingNotificationEmail } from '../services/email/rentAChef/bookingEmailNotifications';
+
+const firstNameOf = (fullName?: string) => (fullName || 'there').trim().split(' ')[0];
 
 export const createProcurement = async (req: Request, res: Response): Promise<any> => {
   try {
@@ -38,6 +42,19 @@ export const createProcurement = async (req: Request, res: Response): Promise<an
       });
     } catch (err) {
       console.error('Failed to create notification for procurement creation', err);
+    }
+
+    if (booking.customerId) {
+      const customer = await User.findById(booking.customerId).select('fullName email');
+      if (customer?.email) {
+        await sendBookingNotificationEmail({
+          firstName: firstNameOf(customer.fullName),
+          email: customer.email,
+          heading: 'Procurement added to your booking',
+          message: `Additional procurement items were added to your booking. Total cost: ${procurement.totalCost}.`,
+          bookingNumber: booking.bookingNumber,
+        });
+      }
     }
 
     return res.status(201).json({ success: true, payload: procurement });
@@ -181,7 +198,7 @@ export const markProcurementPaid = async (req: Request, res: Response): Promise<
     // If channel is transfer, only admins should be allowed to mark paid.
     const requester: any = (req as any).user;
     if (paymentChannel === 'transfer') {
-      if (!requester || !requester.isAdmin) {
+      if (!requester || requester.userType !== 'Admin') {
         return res.status(403).json({ success: false, message: 'Only admins can mark transfer payments as paid' });
       }
 

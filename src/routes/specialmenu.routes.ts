@@ -1,5 +1,5 @@
 import express from "express";
-import { adminAuth } from "../middleware/adminAuth";
+import { requireAdminAuth } from "../middleware/auth/adminAuth.middleware";
 import uploadAdImages from "../middleware/upload";
 
 import { addProcurements, createSpecialMenu,deleteSpecialMenu,getAllSpecialMenus, getSpecialMenuById, updateSpecialMenu } from "../controllers/specialMenu.controller";
@@ -140,7 +140,7 @@ router.get("/specialmenu/:id", getSpecialMenuById);
  *             schema:
  *               $ref: '#/components/schemas/SpecialMenuResponse'
  */
-router.put("/specialmenu/:id", adminAuth, uploadAdImages.single("menuPic"), updateSpecialMenu);
+router.put("/specialmenu/:id", requireAdminAuth, uploadAdImages.single("menuPic"), updateSpecialMenu);
 
 /**
  * @openapi
@@ -165,7 +165,7 @@ router.put("/specialmenu/:id", adminAuth, uploadAdImages.single("menuPic"), upda
  *             schema:
  *               $ref: '#/components/schemas/SpecialMenuDeleteResponse'
  */
-router.delete("/specialmenu/:id", adminAuth, deleteSpecialMenu);
+router.delete("/specialmenu/:id", requireAdminAuth, deleteSpecialMenu);
 
 /**
  * @openapi
@@ -196,7 +196,7 @@ router.delete("/specialmenu/:id", adminAuth, deleteSpecialMenu);
  *             schema:
  *               $ref: '#/components/schemas/SpecialMenuResponse'
  */
-router.post("/specialmenu/:menuId/procurement", adminAuth, addProcurements);
+router.post("/specialmenu/:menuId/procurement", requireAdminAuth, addProcurements);
 // router.delete("/specialmenu/:menuId/procurement/:title", removeProcurementItem);
 
 export default router;

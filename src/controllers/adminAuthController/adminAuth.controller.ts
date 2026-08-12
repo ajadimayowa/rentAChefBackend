@@ -1,93 +1,62 @@
 import { Request, Response } from "express";
-import Admin from "../../models/Admin";
-import { generateToken } from "../../utils/generateToken";
-import Chef from "../../models/Chef";
-import UserModel from "../../models/User.model";
-import Category from "../../models/Category";
-import { ServiceModel } from "../../models/Service";
+import UserModel, { IUser } from "../../models/User.model";
 import { BookingModel } from "../../models/Booking";
+import { sendAdminCreationEmail } from "../../services/email/rentAChef/adminEmailNotification";
+import {
+  ACTIVE_BOOKING_STATUSES,
+  CLOSED_BOOKING_STATUSES,
+  bestEffortBookingDate,
+  bestEffortGuestCount,
+  minorToNaira,
+} from "../../utils/bookingStatus";
 
-export const adminLogin = async (req: Request, res: Response): Promise<any> => {
-  try {
-    const { email, password } = req.body;
-
-    const admin = await Admin.findOne({ email });
-    if (!admin)
-      return res.status(401).json({ success: false, message: "Invalid credentials" });
-
-    if (!admin.isActive)
-      return res.status(403).json({ success: false, message: "Admin account disabled" });
-
-    const isMatch = await admin.comparePassword(password);
-    if (!isMatch)
-      return res.status(401).json({ success: false, message: "Invalid credentials" });
-
-    const token = generateToken({
-      id: admin._id,
-      role: admin.role
-    });
-
-    const categories = await Category.find()
-      .select('_id name') // only fetch what you need
-      .lean();
-
-    const services = await ServiceModel.find()
-      .select('_id name') // only fetch what you need
-      .lean();
-
-    const formattedCategories = categories.map(cat => ({
-      label: cat.name,
-      value: cat._id,
-    }));
-
-    const formattedServices = services.map(cat => ({
-      name: cat.name,
-      id: cat._id,
-    }));
-    res.status(200).json({
-      success: true,
-      message: "Login successful",
-      token,
-      payload: {
-        id: admin._id,
-        fullName: admin.fullName,
-        email: admin.email,
-        role: admin.role,
-        formattedCategories,
-        formattedServices
-      }
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, message: "Server error", error: error });
-  }
-};
+/** Flattens an admin user document into the shape the admin dashboard consumes. */
+const toAdminPayload = (admin: IUser) => ({
+  id: admin._id,
+  fullName: admin.fullName,
+  email: admin.email,
+  role: admin.adminDetails?.role,
+  isActive: admin.isActive,
+});
 
 export const createAdmin = async (req: Request, res: Response): Promise<any> => {
   try {
     const { fullName, email, password, role } = req.body;
 
-    const existingAdmin = await Admin.findOne({ email });
+    const existingAdmin = await UserModel.findOne({ email });
     if (existingAdmin)
-      return res.status(400).json({ message: "Admin already exists" });
+      return res.status(400).json({ success: false, message: "Admin already exists" });
 
-    const admin = await Admin.create({
+    const firstName = fullName?.trim().split(" ")[0];
+
+    const admin = await UserModel.create({
       fullName,
+      firstName,
       email,
       password,
-      role: role || "admin"
+      userType: "Admin",
+      adminDetails: { role: role || "admin" },
+      isActive: true
     });
 
-    res.status(201).json({
-      message: "Admin created successfully",
-      admin: {
-        id: admin._id,
+    try {
+      await sendAdminCreationEmail({
+        email,
         fullName: admin.fullName,
-        email: admin.email,
-        role: admin.role
-      }
+        firstName,
+        role: admin.adminDetails?.role || "admin",
+      });
+    } catch (error) {
+      console.log(error);
+    }
+
+    res.status(201).json({
+      success: true,
+      message: "Admin created successfully",
+      payload: toAdminPayload(admin)
     });
   } catch (error) {
-    res.status(500).json({ message: "Failed to create admin", error });
+    res.status(500).json({ success: false, message: "Failed to create admin", error });
   }
 };
 
@@ -99,17 +68,18 @@ export const getAdmins = async (req: Request, res: Response): Promise<any> => {
     const skip = (page - 1) * limit;
 
     const [admins, total] = await Promise.all([
-      Admin.find()
+      UserModel.find({ userType: "Admin" })
         .select("-password")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit),
-      Admin.countDocuments(),
+      UserModel.countDocuments({ userType: "Admin" }),
     ]);
 
     return res.status(200).json({
       success: true,
-      data: admins,
+      message: "Admins fetched successfully",
+      payload: admins.map(toAdminPayload),
       meta: {
         total,
         page,
@@ -128,7 +98,7 @@ export const getAdmins = async (req: Request, res: Response): Promise<any> => {
 
 export const getAdminById = async (req: Request, res: Response): Promise<any> => {
   try {
-    const admin = await Admin.findById(req.params.id).select("-password");
+    const admin = await UserModel.findOne({ _id: req.params.id, userType: "Admin" }).select("-password");
 
     if (!admin) {
       return res.status(404).json({
@@ -139,7 +109,8 @@ export const getAdminById = async (req: Request, res: Response): Promise<any> =>
 
     return res.status(200).json({
       success: true,
-      data: admin,
+      message: "Admin fetched successfully",
+      payload: toAdminPayload(admin),
     });
   } catch (error) {
     return res.status(500).json({
@@ -150,66 +121,139 @@ export const getAdminById = async (req: Request, res: Response): Promise<any> =>
   }
 };
 
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** Percentage change from `previous` to `current`; null (not 0) when there's no prior-period baseline to compare against. */
+const percentDelta = (current: number, previous: number): number | null => {
+  if (!previous) return null;
+  return Math.round((current - previous) / previous * 1000) / 10;
+};
+
+const monthRange = (monthsAgo: number): { start: Date; end: Date } => {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth() - monthsAgo, 1, 0, 0, 0, 0);
+  const end = new Date(now.getFullYear(), now.getMonth() - monthsAgo + 1, 1, 0, 0, 0, 0);
+  return { start, end };
+};
+
 export const getAdminDashboard = async (req: Request, res: Response): Promise<any> => {
-
   try {
-    // compute counts
-    const [chefsCount, customersCount] = await Promise.all([
-      Chef.countDocuments(),
-      UserModel.countDocuments(),
+    const thisMonth = monthRange(0);
+    const lastMonth = monthRange(1);
+
+    const [
+      approvedChefs,
+      pendingChefs,
+      customers,
+      customersThisMonth,
+      customersLastMonth,
+      activeBookings,
+      activeBookingsThisMonth,
+      activeBookingsLastMonth,
+      revenueThisMonthAgg,
+      revenueLastMonthAgg,
+      revenueTrendAgg,
+      approvalQueue,
+      upcomingBookingsRaw,
+    ] = await Promise.all([
+      UserModel.countDocuments({ userType: "Chef", isActive: true }),
+      UserModel.countDocuments({ userType: "Chef", isActive: false }),
+      UserModel.countDocuments({ userType: "Customer" }),
+      UserModel.countDocuments({ userType: "Customer", createdAt: { $gte: thisMonth.start, $lt: thisMonth.end } }),
+      UserModel.countDocuments({ userType: "Customer", createdAt: { $gte: lastMonth.start, $lt: lastMonth.end } }),
+      BookingModel.countDocuments({ status: { $in: ACTIVE_BOOKING_STATUSES } }),
+      BookingModel.countDocuments({
+        status: { $in: ACTIVE_BOOKING_STATUSES },
+        createdAt: { $gte: thisMonth.start, $lt: thisMonth.end },
+      }),
+      BookingModel.countDocuments({
+        status: { $in: ACTIVE_BOOKING_STATUSES },
+        createdAt: { $gte: lastMonth.start, $lt: lastMonth.end },
+      }),
+      BookingModel.aggregate([
+        { $match: { paymentStatus: "Paid", createdAt: { $gte: thisMonth.start, $lt: thisMonth.end } } },
+        { $group: { _id: null, total: { $sum: { $ifNull: ["$pricingSnapshot.estimatedTotalMinor", 0] } } } },
+      ]),
+      BookingModel.aggregate([
+        { $match: { paymentStatus: "Paid", createdAt: { $gte: lastMonth.start, $lt: lastMonth.end } } },
+        { $group: { _id: null, total: { $sum: { $ifNull: ["$pricingSnapshot.estimatedTotalMinor", 0] } } } },
+      ]),
+      BookingModel.aggregate([
+        { $match: { paymentStatus: "Paid", createdAt: { $gte: monthRange(5).start } } },
+        {
+          $group: {
+            _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
+            total: { $sum: { $ifNull: ["$pricingSnapshot.estimatedTotalMinor", 0] } },
+          },
+        },
+      ]),
+      UserModel.find({ userType: "Chef", isActive: false })
+        .select("fullName profilePic createdAt")
+        .sort({ createdAt: -1 })
+        .limit(6),
+      BookingModel.find({ status: { $nin: CLOSED_BOOKING_STATUSES } })
+        .select("bookingNumber customerId chefId serviceId status pricingSnapshot startDate bookingData createdAt")
+        .populate("customerId", "fullName")
+        .populate("chefId", "fullName")
+        .populate("serviceId", "name")
+        .sort({ createdAt: -1 })
+        .limit(5),
     ]);
 
-    // compute total revenue from confirmed bookings (sum of totalAmount)
-    const revenueAgg = await BookingModel.aggregate([
-      { $match: { status: 'confirmed' } },
-      { $group: { _id: null, totalRevenue: { $sum: { $ifNull: ["$totalAmount", 0] } } } }
-    ]);
-    const totalRevenue = revenueAgg?.[0]?.totalRevenue || 0;
+    const revenueThisMonth = minorToNaira(revenueThisMonthAgg?.[0]?.total || 0);
+    const revenueLastMonth = minorToNaira(revenueLastMonthAgg?.[0]?.total || 0);
 
-    // booking trends for last 6 months (including current month)
-    const now = new Date();
-    const start = new Date(now.getFullYear(), now.getMonth() - 5, 1, 0, 0, 0, 0);
-
-    const trendsAgg = await BookingModel.aggregate([
-      { $match: { status: 'confirmed', createdAt: { $gte: start } } },
-      { $group: { _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } }, count: { $sum: 1 } } },
-      { $sort: { '_id.year': 1, '_id.month': 1 } }
-    ]);
-
-    // build last 6 months labels and map counts
-    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const chartData = [] as Array<{ name: string; users: number }>;
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const year = d.getFullYear();
-      const month = d.getMonth() + 1; // aggregate months are 1-based
-      const entry = trendsAgg.find((t: any) => t._id.year === year && t._id.month === month);
-      chartData.push({ name: monthNames[month - 1], users: entry ? entry.count : 0 });
+    const trendByMonth = new Map<string, number>();
+    for (const row of revenueTrendAgg as any[]) {
+      trendByMonth.set(`${row._id.year}-${row._id.month}`, minorToNaira(row.total));
     }
-    // const admin = await Admin.findById(req.params.id).select("-password");
 
-    // if (!admin) {
-    //   return res.status(404).json({
-    //     success: false,
-    //     message: "Admin not found",
-    //   });
-    // }
+    const revenueTrend: { month: string; revenue: number }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(thisMonth.start.getFullYear(), thisMonth.start.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${d.getMonth() + 1}`;
+      revenueTrend.push({ month: MONTH_NAMES[d.getMonth()], revenue: trendByMonth.get(key) || 0 });
+    }
 
     return res.status(200).json({
       success: true,
       payload: {
-        cardData: {
-          revenue: totalRevenue,
-          customers: customersCount,
-          chefs: chefsCount,
+        metrics: {
+          grossRevenue: revenueTrend.reduce((sum, m) => sum + m.revenue, 0),
+          revenueThisMonth,
+          revenueDeltaPct: percentDelta(revenueThisMonth, revenueLastMonth),
+          activeBookings,
+          activeBookingsDeltaPct: percentDelta(activeBookingsThisMonth, activeBookingsLastMonth),
+          approvedChefs,
+          pendingChefs,
+          customers,
+          newCustomersDeltaPct: percentDelta(customersThisMonth, customersLastMonth),
         },
-        bookings: chartData,
+        revenueTrend,
+        approvalQueue: approvalQueue.map((chef: any) => ({
+          id: chef._id,
+          name: chef.fullName,
+          avatar: chef.profilePic || "",
+          joinedAt: chef.createdAt,
+        })),
+        upcomingBookings: upcomingBookingsRaw.map((booking: any) => ({
+          id: booking._id,
+          bookingNumber: booking.bookingNumber,
+          customerName: booking.customerId?.fullName || "Unassigned",
+          chefName: booking.chefId?.fullName || "Unassigned",
+          serviceName: booking.serviceId?.name || "—",
+          date: bestEffortBookingDate(booking),
+          guests: bestEffortGuestCount(booking.bookingData),
+          amount: minorToNaira(booking.pricingSnapshot?.estimatedTotalMinor || 0),
+          status: booking.status,
+        })),
       },
     });
   } catch (error) {
+    console.error("Admin Dashboard Error:", error);
     return res.status(500).json({
       success: false,
-      message: "Failed to fetch admin",
+      message: "Failed to fetch admin dashboard",
       error,
     });
   }
@@ -224,7 +268,7 @@ export const updateAdmin = async (req: Request, res: Response): Promise<any> => 
   try {
     const { fullName, email, role, isActive, password } = req.body;
 
-    const admin = await Admin.findById(req.params.id);
+    const admin = await UserModel.findOne({ _id: req.params.id, userType: "Admin" });
 
     if (!admin) {
       return res.status(404).json({
@@ -235,7 +279,7 @@ export const updateAdmin = async (req: Request, res: Response): Promise<any> => 
 
     if (fullName !== undefined) admin.fullName = fullName;
     if (email !== undefined) admin.email = email;
-    if (role !== undefined) admin.role = role;
+    if (role !== undefined) admin.adminDetails = { ...admin.adminDetails, role };
     if (isActive !== undefined) admin.isActive = isActive;
 
     // Allow password update (will be hashed by pre-save hook)
@@ -245,13 +289,10 @@ export const updateAdmin = async (req: Request, res: Response): Promise<any> => 
 
     await admin.save();
 
-    const updatedAdmin = admin.toJSON();
-    // delete updatedAdmin.password;
-
     return res.status(200).json({
       success: true,
       message: "Admin updated successfully",
-      data: updatedAdmin,
+      payload: toAdminPayload(admin),
     });
   } catch (error: any) {
     if (error.code === 11000) {
@@ -276,7 +317,7 @@ export const updateAdmin = async (req: Request, res: Response): Promise<any> => 
  */
 export const deleteAdmin = async (req: Request, res: Response): Promise<any> => {
   try {
-    const admin = await Admin.findByIdAndDelete(req.params.id);
+    const admin = await UserModel.findOneAndDelete({ _id: req.params.id, userType: "Admin" });
 
     if (!admin) {
       return res.status(404).json({

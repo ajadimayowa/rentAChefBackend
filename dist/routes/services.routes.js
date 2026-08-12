@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const services_controller_1 = require("../controllers/services/services.controller");
+const adminAuth_middleware_1 = require("../middleware/auth/adminAuth.middleware");
 const router = (0, express_1.Router)();
 /**
  * @openapi
@@ -24,7 +25,7 @@ const router = (0, express_1.Router)();
  *             schema:
  *               $ref: '#/components/schemas/ServiceResponse'
  */
-router.post("/service/create", services_controller_1.createService);
+router.post("/service/create", adminAuth_middleware_1.requireAdminAuth, services_controller_1.createService);
 /**
  * @openapi
  * /service/services:
@@ -90,7 +91,7 @@ router.get("/service/:id", services_controller_1.getServiceById);
  *             schema:
  *               $ref: '#/components/schemas/ServiceResponse'
  */
-router.put("/service/:id", services_controller_1.updateService);
+router.put("/service/:id", adminAuth_middleware_1.requireAdminAuth, services_controller_1.updateService);
 /**
  * @openapi
  * /service/{id}:
@@ -112,5 +113,5 @@ router.put("/service/:id", services_controller_1.updateService);
  *             schema:
  *               $ref: '#/components/schemas/ServiceDeleteResponse'
  */
-router.delete("/service/:id", services_controller_1.deleteService);
+router.delete("/service/:id", adminAuth_middleware_1.requireAdminAuth, services_controller_1.deleteService);
 exports.default = router;

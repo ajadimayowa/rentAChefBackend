@@ -1,4 +1,9 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
+import {
+  BookingStatus as PlatformBookingStatus,
+  PaymentStatus as PlatformPaymentStatus,
+  BookingType as PlatformBookingType,
+} from "../platform/domain/enums";
 
 export interface IBooking extends Document {
   bookingNumber: string;
@@ -12,11 +17,11 @@ export interface IBooking extends Document {
 
   workflow?: string;
 
-  bookingType?: 'INSTANT' | 'QUOTATION';
-  modeOfPayment?: 'Paystack' | 'Transfer' | 'Unpaid';
+  bookingType?: PlatformBookingType;
+  modeOfPayment?: 'Paystack' | 'Transfer' | 'Cash' | 'Unpaid';
 
-  status: BookingStatus;
-  paymentStatus: PaymentStatus;
+  status: PlatformBookingStatus;
+  paymentStatus: PlatformPaymentStatus;
   startDate?: Date;
   endDate?: Date;
 
@@ -40,23 +45,36 @@ export interface IBooking extends Document {
 
   procurement?: IProcurement;
 
+  comments?: Array<{
+    text: string;
+    authorId: string;
+    authorName?: string;
+    createdAt: Date;
+  }>;
+
+  paymentDetails?: {
+    mode: 'Cash' | 'Transfer';
+    transactionRef: string;
+    bankName?: string;
+    accountNumber?: string;
+    amount: number;
+    date: Date;
+    recordedBy: string;
+    recordedAt: Date;
+  };
+
   quotationId?: string;
   transactnRef?: string;
 }
 
-export type BookingStatus =
-  | "Submitted"
-  | "Admin review"
-  | "Quotation sent"
-  | "Chef assigned"
-  | "In progress"
-  | "Completed"
-  | "Cancelled"
-
-export type PaymentStatus =
-  | "Unpaid"
-  | "Paid"
-  | "Failed"
+/**
+ * Re-exported from `platform/domain/enums` — this is the enum actually enforced by
+ * `ChefPlatformBookingModel` (platform/infrastructure/database/schemas/booking.schema.ts),
+ * which writes to the same underlying `bookings` collection as this model. Deriving
+ * from the same source keeps the two schemas from drifting out of sync again (they
+ * previously disagreed on casing and were missing "Payment Pending"/"Paid").
+ */
+export { PlatformBookingStatus as BookingStatus, PlatformPaymentStatus as PaymentStatus };
 
 export interface IMenuSelection {
   source: "chef" | "customer";
@@ -86,11 +104,25 @@ const ProcurementSchema = new Schema<IProcurement>({
   procurementFee: Number,
 });
 
+const PaymentDetailsSchema = new Schema(
+  {
+    mode: { type: String, enum: ["Cash", "Transfer"], required: true },
+    transactionRef: { type: String, required: true },
+    bankName: { type: String },
+    accountNumber: { type: String },
+    amount: { type: Number, required: true },
+    date: { type: Date, required: true },
+    recordedBy: { type: String, required: true },
+    recordedAt: { type: Date, required: true, default: Date.now },
+  },
+  { _id: false }
+);
+
 const BookingSchema = new Schema<IBooking>(
   {
     bookingNumber: { type: String, required: true, unique: true, index: true },
     customerId: { type: Schema.Types.ObjectId, ref: "User", index: true },
-    chefId: { type: Schema.Types.ObjectId, ref: "Chef", index: true },
+    chefId: { type: Schema.Types.ObjectId, ref: "User", index: true },
     specialServiceId: { type: Schema.Types.ObjectId, ref: "SpecialMenu", index: true },
     serviceId: {
       type: Schema.Types.ObjectId,
@@ -107,34 +139,26 @@ const BookingSchema = new Schema<IBooking>(
 
     bookingType: {
       type: String,
-      enum: ["instant", "quotation"],
+      enum: Object.values(PlatformBookingType),
     },
 
     modeOfPayment: {
       type: String,
-      enum: ['Paystack', 'Transfer', 'Unpaid'],
+      enum: ['Paystack', 'Transfer', 'Cash', 'Unpaid'],
       index: true,
     },
 
     status: {
       type: String,
-      enum: [
-        "Submitted",
-        "Admin reviewed",
-        "Quotation sent",
-        "Chef assigned",
-        "In progress",
-        "Completed",
-        "Cancelled",
-      ],
+      enum: Object.values(PlatformBookingStatus),
       index: true,
-      default: "Submitted",
+      default: PlatformBookingStatus.SUBMITTED,
     },
 
     paymentStatus: {
       type: String,
-      enum: ["Unpaid", "Paid", "Failed"],
-      default: "Unpaid",
+      enum: Object.values(PlatformPaymentStatus),
+      default: PlatformPaymentStatus.UNPAID,
       index: true,
     },
 
@@ -148,7 +172,7 @@ const BookingSchema = new Schema<IBooking>(
 
     timeline: [
       {
-        status: { type: String, required: true },
+        status: { type: String, enum: Object.values(PlatformBookingStatus), required: true },
         changedBy: { type: String, required: true },
         changedAt: { type: Date, required: true },
         reason: { type: String },
@@ -161,6 +185,17 @@ const BookingSchema = new Schema<IBooking>(
     customerUploadedMenuFileId: { type: Schema.Types.ObjectId, ref: 'UploadedFile' },
 
     procurement: ProcurementSchema,
+
+    comments: [
+      {
+        text: { type: String, required: true },
+        authorId: { type: String, required: true },
+        authorName: { type: String },
+        createdAt: { type: Date, required: true, default: Date.now },
+      },
+    ],
+
+    paymentDetails: PaymentDetailsSchema,
 
     quotationId: { type: Schema.Types.ObjectId, ref: "Quotation" },
 

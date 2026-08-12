@@ -6,6 +6,7 @@ import {
   updateTermsAndCon,
   deleteTermsAndCon,
 } from "../controllers/termsAndCon/termsAndCon.controller";
+import { requireAdminAuth } from "../middleware/auth/adminAuth.middleware";
 
 const router = Router();
 
@@ -30,7 +31,7 @@ const router = Router();
  *             schema:
  *               $ref: '#/components/schemas/TermsAndConResponse'
  */
-router.post("/terms-and-con/create", createTermsAndCon);
+router.post("/terms-and-con/create", requireAdminAuth, createTermsAndCon);
 
 /**
  * @openapi
@@ -120,7 +121,7 @@ router.get("/terms-and-con/:id", getTermsAndConById);
  *             schema:
  *               $ref: '#/components/schemas/TermsAndConResponse'
  */
-router.put("/terms-and-con/:id", updateTermsAndCon);
+router.put("/terms-and-con/:id", requireAdminAuth, updateTermsAndCon);
 
 /**
  * @openapi
@@ -143,6 +144,6 @@ router.put("/terms-and-con/:id", updateTermsAndCon);
  *             schema:
  *               $ref: '#/components/schemas/TermsAndConDeleteResponse'
  */
-router.delete("/terms-and-con/:id", deleteTermsAndCon);
+router.delete("/terms-and-con/:id", requireAdminAuth, deleteTermsAndCon);
 
 export default router;

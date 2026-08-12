@@ -6,6 +6,7 @@ import {
   updateService,
   deleteService,
 } from "../controllers/services/services.controller";
+import { requireAdminAuth } from "../middleware/auth/adminAuth.middleware";
 
 const router = Router();
 
@@ -30,7 +31,7 @@ const router = Router();
  *             schema:
  *               $ref: '#/components/schemas/ServiceResponse'
  */
-router.post("/service/create", createService);
+router.post("/service/create", requireAdminAuth, createService);
 
 /**
  * @openapi
@@ -99,7 +100,7 @@ router.get("/service/:id", getServiceById);
  *             schema:
  *               $ref: '#/components/schemas/ServiceResponse'
  */
-router.put("/service/:id", updateService);
+router.put("/service/:id", requireAdminAuth, updateService);
 
 /**
  * @openapi
@@ -122,7 +123,7 @@ router.put("/service/:id", updateService);
  *             schema:
  *               $ref: '#/components/schemas/ServiceDeleteResponse'
  */
-router.delete("/service/:id", deleteService);
+router.delete("/service/:id", requireAdminAuth, deleteService);
 
 
 export default router;

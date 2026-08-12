@@ -3,10 +3,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const notification_controller_1 = require("../controllers/notification.controller");
 const auth_middleware_1 = require("../middleware/auth.middleware");
-const adminAuth_1 = require("../middleware/adminAuth");
+const adminAuth_middleware_1 = require("../middleware/auth/adminAuth.middleware");
 const router = (0, express_1.Router)();
 // Create notification (protected)
-router.post('/notification/create', adminAuth_1.adminAuth, notification_controller_1.createNotification);
+router.post('/notification/create', adminAuth_middleware_1.requireAdminAuth, notification_controller_1.createNotification);
 // Get notifications for user (public read) - requires `userId` query param or authenticated user
 router.get('/notifications', notification_controller_1.getNotifications);
 // Get single notification

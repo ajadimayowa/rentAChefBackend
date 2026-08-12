@@ -49,6 +49,35 @@ const PackageSchema = new mongoose_1.Schema({
         type: String,
         default: null,
     },
+    price: {
+        type: Number,
+        required: true,
+        min: 0,
+    },
+    durationHours: {
+        type: Number,
+        required: true,
+        min: 0,
+    },
+    guests: {
+        type: Number,
+        required: true,
+        min: 1,
+    },
+    perks: {
+        type: [String],
+        default: [],
+    },
+    isActive: {
+        type: Boolean,
+        default: true,
+    },
+    serviceIds: [
+        {
+            type: mongoose_1.Schema.Types.ObjectId,
+            ref: "Service",
+        },
+    ],
     menus: [
         {
             type: mongoose_1.Schema.Types.ObjectId,

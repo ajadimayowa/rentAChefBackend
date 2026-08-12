@@ -11,7 +11,7 @@ export interface IChefService extends Document {
 
 const ChefServiceSchema = new Schema<IChefService>(
     {
-        chefId: { type: Schema.Types.ObjectId, ref: "Chef", required: true },
+        chefId: { type: Schema.Types.ObjectId, ref: "User", required: true },
         serviceId: { type: Schema.Types.ObjectId, ref: "Service", required: true },
         isAvailable: { type: Boolean, default: true },
     },

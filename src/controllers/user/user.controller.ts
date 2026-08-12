@@ -3,11 +3,18 @@ import bcrypt from "bcryptjs";
 import mongoose from "mongoose";
 import * as crypto from "crypto";
 import UserModel from "../../models/User.model";
+import { BookingModel } from "../../models/Booking";
+import {
+  CLOSED_BOOKING_STATUSES,
+  bestEffortBookingDate,
+  bestEffortGuestCount,
+  minorToNaira,
+} from "../../utils/bookingStatus";
 
 
 export const getAllUsers = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { page = 1, limit = 10, search = "" } = req.query;
+    const { page = 1, limit = 10, search = "", userType, isActive } = req.query;
 
     const pageNum = Math.max(parseInt(page as string, 10), 1);
     const limitNum = Math.max(parseInt(limit as string, 10), 1);
@@ -15,15 +22,22 @@ export const getAllUsers = async (req: Request, res: Response): Promise<void> =>
 
     const query: any = {};
 
-    if (search && typeof search === "string") {
-      const regex = new RegExp(search.trim(), "i");
+    if (userType && typeof userType === "string") {
+      query.userType = userType;
+    }
+
+    if (isActive !== undefined) {
+      query.isActive = String(isActive) === "true";
+    }
+
+    if (search && typeof search === "string" && search.trim()) {
+      const regex = new RegExp(search.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
 
       query.$or = [
-        { "profile.fullName": regex },
-        { "profile.firstName": regex },
-        { "profile.lastName": regex },
-        { "contact.email": regex },
-        { "contact.phoneNumber": regex },
+        { fullName: regex },
+        { email: regex },
+        { phoneNumber: regex },
+        { "address.city": regex },
       ];
     }
 
@@ -36,20 +50,51 @@ export const getAllUsers = async (req: Request, res: Response): Promise<void> =>
     ]);
 
     res.status(200).json({
+      success: true,
       message: "Users retrieved successfully",
       meta: {
         total,
         page: pageNum,
-        totalPages: Math.ceil(total / limitNum),
+        totalPages: Math.ceil(total / limitNum) || 1,
         limit: limitNum,
       },
       data: users,
     });
   } catch (error) {
     res.status(500).json({
+      success: false,
       message: "Error fetching users",
       error,
     });
+  }
+};
+
+/** Admin toggle for a user's active flag — e.g. suspending or reinstating a customer account. There's no separate pending/rejected state on the schema, just isActive. */
+export const updateUserActiveStatus = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const { id } = req.params;
+    const { isActive } = req.body as { isActive?: boolean };
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: "Invalid user ID" });
+    }
+
+    if (typeof isActive !== "boolean") {
+      return res.status(400).json({ success: false, message: "isActive must be a boolean" });
+    }
+
+    const user = await UserModel.findByIdAndUpdate(id, { isActive }, { new: true });
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "User status updated",
+      data: user,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Error updating user status", error });
   }
 };
 
@@ -83,6 +128,7 @@ export const getUserById = async (req: Request, res: Response): Promise<void> =>
   }
 };
 
+/** Customer's own dashboard summary — booking counts, lifetime spend, and upcoming bookings. */
 export const getUserDashboard = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
@@ -92,25 +138,125 @@ export const getUserDashboard = async (req: Request, res: Response): Promise<voi
       return;
     }
 
+    const requester = (req as any).user;
+    const isOwner = requester && String(requester._id) === id;
+    const isAdmin = requester?.userType === "Admin";
+    if (!isOwner && !isAdmin) {
+      res.status(403).json({ message: "You can only view your own dashboard" });
+      return;
+    }
 
-    const user = await UserModel.findById(id).select("-profile.password");
+    const user = await UserModel.findOne({ _id: id, userType: "Customer" }).select("-password");
     if (!user) {
       res.status(404).json({ message: "User not found" });
       return;
     }
 
+    const [totalBookings, upcomingBookingsCount, spendAgg, upcomingBookingsRaw] = await Promise.all([
+      BookingModel.countDocuments({ customerId: id }),
+      BookingModel.countDocuments({ customerId: id, status: { $nin: CLOSED_BOOKING_STATUSES } }),
+      BookingModel.aggregate([
+        { $match: { customerId: new mongoose.Types.ObjectId(id), paymentStatus: "Paid" } },
+        { $group: { _id: null, total: { $sum: { $ifNull: ["$pricingSnapshot.estimatedTotalMinor", 0] } } } },
+      ]),
+      BookingModel.find({ customerId: id, status: { $nin: CLOSED_BOOKING_STATUSES } })
+        .select("bookingNumber chefId serviceId status pricingSnapshot startDate bookingData createdAt")
+        .populate("chefId", "fullName")
+        .populate("serviceId", "name")
+        .sort({ createdAt: -1 })
+        .limit(5),
+    ]);
+
     res.status(200).json({
-      message: "User retrieved successfully",
-      payload: user,
+      message: "User dashboard retrieved successfully",
+      payload: {
+        user: { id: user._id, fullName: user.fullName, firstName: user.firstName, email: user.email },
+        metrics: {
+          upcomingBookings: upcomingBookingsCount,
+          totalBookings,
+          lifetimeSpend: minorToNaira(spendAgg?.[0]?.total || 0),
+        },
+        upcomingBookings: upcomingBookingsRaw.map((booking: any) => ({
+          id: booking._id,
+          bookingNumber: booking.bookingNumber,
+          chefName: booking.chefId?.fullName || "Unassigned",
+          serviceName: booking.serviceId?.name || "—",
+          date: bestEffortBookingDate(booking),
+          guests: bestEffortGuestCount(booking.bookingData),
+          amount: minorToNaira(booking.pricingSnapshot?.estimatedTotalMinor || 0),
+          status: booking.status,
+        })),
+      },
     });
   } catch (error) {
     res.status(500).json({
-      message: "Error fetching user",
+      message: "Error fetching user dashboard",
       error,
     });
   }
 };
 
+/** Customer's own booking list (ownership-checked — same rule as getUserDashboard). */
+export const getUserBookings = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400).json({ message: "Invalid user ID" });
+      return;
+    }
+
+    const requester = (req as any).user;
+    const isOwner = requester && String(requester._id) === id;
+    const isAdmin = requester?.userType === "Admin";
+    if (!isOwner && !isAdmin) {
+      res.status(403).json({ message: "You can only view your own bookings" });
+      return;
+    }
+
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const limit = Math.max(Number(req.query.limit) || 10, 1);
+    const skip = (page - 1) * limit;
+
+    const status = req.query.status as string | undefined;
+    const filter: any = { customerId: id };
+    if (status && status !== "all") filter.status = status;
+
+    const [bookings, total] = await Promise.all([
+      BookingModel.find(filter)
+        .select("bookingNumber chefId serviceId workflow status paymentStatus pricingSnapshot startDate bookingData createdAt")
+        .populate("chefId", "fullName")
+        .populate("serviceId", "name")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      BookingModel.countDocuments(filter),
+    ]);
+
+    res.status(200).json({
+      message: "Bookings retrieved successfully",
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) || 1 },
+      payload: bookings.map((b: any) => ({
+        id: b._id,
+        bookingNumber: b.bookingNumber,
+        chefName: b.chefId?.fullName || "Unassigned",
+        serviceName: b.serviceId?.name || "—",
+        workflow: b.workflow,
+        status: b.status,
+        paymentStatus: b.paymentStatus,
+        date: bestEffortBookingDate(b),
+        guests: bestEffortGuestCount(b.bookingData),
+        amount: minorToNaira(b.pricingSnapshot?.estimatedTotalMinor || 0),
+        createdAt: b.createdAt,
+      })),
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error fetching bookings",
+      error,
+    });
+  }
+};
 
 // Update Profile Picture
 export const updateProfilePic = async (req: Request, res: Response): Promise<any> => {
@@ -155,7 +301,7 @@ export const completeKyc = async (req: Request, res: Response): Promise<any> => 
     const updatedUser = await UserModel.findByIdAndUpdate(
       userId,
       {
-        kyc: { idType, idNumber, idPicture: idPic?.location || idPic?.path || "", },
+        "customerDetails.kyc": { idType, idNumber, idPicture: idPic?.location || idPic?.path || "", },
       },
       { new: true, runValidators: true }
     );
@@ -184,7 +330,7 @@ export const updateHealthInformation = async (req: Request, res: Response): Prom
     const updatedUser = await UserModel.findByIdAndUpdate(
       userId,
       {
-        healthInformation: { allergies, healthDetails },
+        "customerDetails.healthInformation": { allergies, healthDetails },
       },
       { new: true, runValidators: true }
     );
@@ -213,7 +359,7 @@ export const updateNok = async (req: Request, res: Response): Promise<any> => {
     const updatedUser = await UserModel.findByIdAndUpdate(
       userId,
       {
-        nok: { fullName, phone, relationship },
+        "customerDetails.nok": { fullName, phone, relationship },
       },
       { new: true, runValidators: true }
     );
@@ -242,7 +388,7 @@ export const updateLocation = async (req: Request, res: Response): Promise<any> 
     const updatedUser = await UserModel.findByIdAndUpdate(
       userId,
       {
-        location: { home, office, state, city, long, lat },
+        "customerDetails.location": { home, office, state, city, long, lat },
       },
       { new: true, runValidators: true }
     );
@@ -275,7 +421,7 @@ export const updateBioData = async (req: Request, res: Response): Promise<any> =
         gender,
         dob,
         maritalStatus,
-        phone:phoneNumber
+        phoneNumber
       },
       { new: true, runValidators: true }
     );

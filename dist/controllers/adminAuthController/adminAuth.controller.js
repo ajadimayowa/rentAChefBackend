@@ -12,86 +12,58 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteAdmin = exports.updateAdmin = exports.getAdminDashboard = exports.getAdminById = exports.getAdmins = exports.createAdmin = exports.adminLogin = void 0;
-const Admin_1 = __importDefault(require("../../models/Admin"));
-const generateToken_1 = require("../../utils/generateToken");
-const Chef_1 = __importDefault(require("../../models/Chef"));
+exports.deleteAdmin = exports.updateAdmin = exports.getAdminDashboard = exports.getAdminById = exports.getAdmins = exports.createAdmin = void 0;
 const User_model_1 = __importDefault(require("../../models/User.model"));
-const Category_1 = __importDefault(require("../../models/Category"));
-const Service_1 = require("../../models/Service");
 const Booking_1 = require("../../models/Booking");
-const adminLogin = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { email, password } = req.body;
-        const admin = yield Admin_1.default.findOne({ email });
-        if (!admin)
-            return res.status(401).json({ success: false, message: "Invalid credentials" });
-        if (!admin.isActive)
-            return res.status(403).json({ success: false, message: "Admin account disabled" });
-        const isMatch = yield admin.comparePassword(password);
-        if (!isMatch)
-            return res.status(401).json({ success: false, message: "Invalid credentials" });
-        const token = (0, generateToken_1.generateToken)({
-            id: admin._id,
-            role: admin.role
-        });
-        const categories = yield Category_1.default.find()
-            .select('_id name') // only fetch what you need
-            .lean();
-        const services = yield Service_1.ServiceModel.find()
-            .select('_id name') // only fetch what you need
-            .lean();
-        const formattedCategories = categories.map(cat => ({
-            label: cat.name,
-            value: cat._id,
-        }));
-        const formattedServices = services.map(cat => ({
-            name: cat.name,
-            id: cat._id,
-        }));
-        res.status(200).json({
-            success: true,
-            message: "Login successful",
-            token,
-            payload: {
-                id: admin._id,
-                fullName: admin.fullName,
-                email: admin.email,
-                role: admin.role,
-                formattedCategories,
-                formattedServices
-            }
-        });
-    }
-    catch (error) {
-        res.status(500).json({ success: false, message: "Server error", error: error });
-    }
-});
-exports.adminLogin = adminLogin;
+const adminEmailNotification_1 = require("../../services/email/rentAChef/adminEmailNotification");
+const bookingStatus_1 = require("../../utils/bookingStatus");
+/** Flattens an admin user document into the shape the admin dashboard consumes. */
+const toAdminPayload = (admin) => {
+    var _a;
+    return ({
+        id: admin._id,
+        fullName: admin.fullName,
+        email: admin.email,
+        role: (_a = admin.adminDetails) === null || _a === void 0 ? void 0 : _a.role,
+        isActive: admin.isActive,
+    });
+};
 const createAdmin = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
         const { fullName, email, password, role } = req.body;
-        const existingAdmin = yield Admin_1.default.findOne({ email });
+        const existingAdmin = yield User_model_1.default.findOne({ email });
         if (existingAdmin)
-            return res.status(400).json({ message: "Admin already exists" });
-        const admin = yield Admin_1.default.create({
+            return res.status(400).json({ success: false, message: "Admin already exists" });
+        const firstName = fullName === null || fullName === void 0 ? void 0 : fullName.trim().split(" ")[0];
+        const admin = yield User_model_1.default.create({
             fullName,
+            firstName,
             email,
             password,
-            role: role || "admin"
+            userType: "Admin",
+            adminDetails: { role: role || "admin" },
+            isActive: true
         });
-        res.status(201).json({
-            message: "Admin created successfully",
-            admin: {
-                id: admin._id,
+        try {
+            yield (0, adminEmailNotification_1.sendAdminCreationEmail)({
+                email,
                 fullName: admin.fullName,
-                email: admin.email,
-                role: admin.role
-            }
+                firstName,
+                role: ((_a = admin.adminDetails) === null || _a === void 0 ? void 0 : _a.role) || "admin",
+            });
+        }
+        catch (error) {
+            console.log(error);
+        }
+        res.status(201).json({
+            success: true,
+            message: "Admin created successfully",
+            payload: toAdminPayload(admin)
         });
     }
     catch (error) {
-        res.status(500).json({ message: "Failed to create admin", error });
+        res.status(500).json({ success: false, message: "Failed to create admin", error });
     }
 });
 exports.createAdmin = createAdmin;
@@ -101,16 +73,17 @@ const getAdmins = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         const limit = Math.max(Number(req.query.limit) || 10, 1);
         const skip = (page - 1) * limit;
         const [admins, total] = yield Promise.all([
-            Admin_1.default.find()
+            User_model_1.default.find({ userType: "Admin" })
                 .select("-password")
                 .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(limit),
-            Admin_1.default.countDocuments(),
+            User_model_1.default.countDocuments({ userType: "Admin" }),
         ]);
         return res.status(200).json({
             success: true,
-            data: admins,
+            message: "Admins fetched successfully",
+            payload: admins.map(toAdminPayload),
             meta: {
                 total,
                 page,
@@ -130,7 +103,7 @@ const getAdmins = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
 exports.getAdmins = getAdmins;
 const getAdminById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const admin = yield Admin_1.default.findById(req.params.id).select("-password");
+        const admin = yield User_model_1.default.findOne({ _id: req.params.id, userType: "Admin" }).select("-password");
         if (!admin) {
             return res.status(404).json({
                 success: false,
@@ -139,7 +112,8 @@ const getAdminById = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         }
         return res.status(200).json({
             success: true,
-            data: admin,
+            message: "Admin fetched successfully",
+            payload: toAdminPayload(admin),
         });
     }
     catch (error) {
@@ -151,61 +125,123 @@ const getAdminById = (req, res) => __awaiter(void 0, void 0, void 0, function* (
     }
 });
 exports.getAdminById = getAdminById;
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+/** Percentage change from `previous` to `current`; null (not 0) when there's no prior-period baseline to compare against. */
+const percentDelta = (current, previous) => {
+    if (!previous)
+        return null;
+    return Math.round((current - previous) / previous * 1000) / 10;
+};
+const monthRange = (monthsAgo) => {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth() - monthsAgo, 1, 0, 0, 0, 0);
+    const end = new Date(now.getFullYear(), now.getMonth() - monthsAgo + 1, 1, 0, 0, 0, 0);
+    return { start, end };
+};
 const getAdminDashboard = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+    var _a, _b;
     try {
-        // compute counts
-        const [chefsCount, customersCount] = yield Promise.all([
-            Chef_1.default.countDocuments(),
-            User_model_1.default.countDocuments(),
+        const thisMonth = monthRange(0);
+        const lastMonth = monthRange(1);
+        const [approvedChefs, pendingChefs, customers, customersThisMonth, customersLastMonth, activeBookings, activeBookingsThisMonth, activeBookingsLastMonth, revenueThisMonthAgg, revenueLastMonthAgg, revenueTrendAgg, approvalQueue, upcomingBookingsRaw,] = yield Promise.all([
+            User_model_1.default.countDocuments({ userType: "Chef", isActive: true }),
+            User_model_1.default.countDocuments({ userType: "Chef", isActive: false }),
+            User_model_1.default.countDocuments({ userType: "Customer" }),
+            User_model_1.default.countDocuments({ userType: "Customer", createdAt: { $gte: thisMonth.start, $lt: thisMonth.end } }),
+            User_model_1.default.countDocuments({ userType: "Customer", createdAt: { $gte: lastMonth.start, $lt: lastMonth.end } }),
+            Booking_1.BookingModel.countDocuments({ status: { $in: bookingStatus_1.ACTIVE_BOOKING_STATUSES } }),
+            Booking_1.BookingModel.countDocuments({
+                status: { $in: bookingStatus_1.ACTIVE_BOOKING_STATUSES },
+                createdAt: { $gte: thisMonth.start, $lt: thisMonth.end },
+            }),
+            Booking_1.BookingModel.countDocuments({
+                status: { $in: bookingStatus_1.ACTIVE_BOOKING_STATUSES },
+                createdAt: { $gte: lastMonth.start, $lt: lastMonth.end },
+            }),
+            Booking_1.BookingModel.aggregate([
+                { $match: { paymentStatus: "Paid", createdAt: { $gte: thisMonth.start, $lt: thisMonth.end } } },
+                { $group: { _id: null, total: { $sum: { $ifNull: ["$pricingSnapshot.estimatedTotalMinor", 0] } } } },
+            ]),
+            Booking_1.BookingModel.aggregate([
+                { $match: { paymentStatus: "Paid", createdAt: { $gte: lastMonth.start, $lt: lastMonth.end } } },
+                { $group: { _id: null, total: { $sum: { $ifNull: ["$pricingSnapshot.estimatedTotalMinor", 0] } } } },
+            ]),
+            Booking_1.BookingModel.aggregate([
+                { $match: { paymentStatus: "Paid", createdAt: { $gte: monthRange(5).start } } },
+                {
+                    $group: {
+                        _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
+                        total: { $sum: { $ifNull: ["$pricingSnapshot.estimatedTotalMinor", 0] } },
+                    },
+                },
+            ]),
+            User_model_1.default.find({ userType: "Chef", isActive: false })
+                .select("fullName profilePic createdAt")
+                .sort({ createdAt: -1 })
+                .limit(6),
+            Booking_1.BookingModel.find({ status: { $nin: bookingStatus_1.CLOSED_BOOKING_STATUSES } })
+                .select("bookingNumber customerId chefId serviceId status pricingSnapshot startDate bookingData createdAt")
+                .populate("customerId", "fullName")
+                .populate("chefId", "fullName")
+                .populate("serviceId", "name")
+                .sort({ createdAt: -1 })
+                .limit(5),
         ]);
-        // compute total revenue from confirmed bookings (sum of totalAmount)
-        const revenueAgg = yield Booking_1.BookingModel.aggregate([
-            { $match: { status: 'confirmed' } },
-            { $group: { _id: null, totalRevenue: { $sum: { $ifNull: ["$totalAmount", 0] } } } }
-        ]);
-        const totalRevenue = ((_a = revenueAgg === null || revenueAgg === void 0 ? void 0 : revenueAgg[0]) === null || _a === void 0 ? void 0 : _a.totalRevenue) || 0;
-        // booking trends for last 6 months (including current month)
-        const now = new Date();
-        const start = new Date(now.getFullYear(), now.getMonth() - 5, 1, 0, 0, 0, 0);
-        const trendsAgg = yield Booking_1.BookingModel.aggregate([
-            { $match: { status: 'confirmed', createdAt: { $gte: start } } },
-            { $group: { _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } }, count: { $sum: 1 } } },
-            { $sort: { '_id.year': 1, '_id.month': 1 } }
-        ]);
-        // build last 6 months labels and map counts
-        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-        const chartData = [];
-        for (let i = 5; i >= 0; i--) {
-            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-            const year = d.getFullYear();
-            const month = d.getMonth() + 1; // aggregate months are 1-based
-            const entry = trendsAgg.find((t) => t._id.year === year && t._id.month === month);
-            chartData.push({ name: monthNames[month - 1], users: entry ? entry.count : 0 });
+        const revenueThisMonth = (0, bookingStatus_1.minorToNaira)(((_a = revenueThisMonthAgg === null || revenueThisMonthAgg === void 0 ? void 0 : revenueThisMonthAgg[0]) === null || _a === void 0 ? void 0 : _a.total) || 0);
+        const revenueLastMonth = (0, bookingStatus_1.minorToNaira)(((_b = revenueLastMonthAgg === null || revenueLastMonthAgg === void 0 ? void 0 : revenueLastMonthAgg[0]) === null || _b === void 0 ? void 0 : _b.total) || 0);
+        const trendByMonth = new Map();
+        for (const row of revenueTrendAgg) {
+            trendByMonth.set(`${row._id.year}-${row._id.month}`, (0, bookingStatus_1.minorToNaira)(row.total));
         }
-        // const admin = await Admin.findById(req.params.id).select("-password");
-        // if (!admin) {
-        //   return res.status(404).json({
-        //     success: false,
-        //     message: "Admin not found",
-        //   });
-        // }
+        const revenueTrend = [];
+        for (let i = 5; i >= 0; i--) {
+            const d = new Date(thisMonth.start.getFullYear(), thisMonth.start.getMonth() - i, 1);
+            const key = `${d.getFullYear()}-${d.getMonth() + 1}`;
+            revenueTrend.push({ month: MONTH_NAMES[d.getMonth()], revenue: trendByMonth.get(key) || 0 });
+        }
         return res.status(200).json({
             success: true,
             payload: {
-                cardData: {
-                    revenue: totalRevenue,
-                    customers: customersCount,
-                    chefs: chefsCount,
+                metrics: {
+                    grossRevenue: revenueTrend.reduce((sum, m) => sum + m.revenue, 0),
+                    revenueThisMonth,
+                    revenueDeltaPct: percentDelta(revenueThisMonth, revenueLastMonth),
+                    activeBookings,
+                    activeBookingsDeltaPct: percentDelta(activeBookingsThisMonth, activeBookingsLastMonth),
+                    approvedChefs,
+                    pendingChefs,
+                    customers,
+                    newCustomersDeltaPct: percentDelta(customersThisMonth, customersLastMonth),
                 },
-                bookings: chartData,
+                revenueTrend,
+                approvalQueue: approvalQueue.map((chef) => ({
+                    id: chef._id,
+                    name: chef.fullName,
+                    avatar: chef.profilePic || "",
+                    joinedAt: chef.createdAt,
+                })),
+                upcomingBookings: upcomingBookingsRaw.map((booking) => {
+                    var _a, _b, _c, _d;
+                    return ({
+                        id: booking._id,
+                        bookingNumber: booking.bookingNumber,
+                        customerName: ((_a = booking.customerId) === null || _a === void 0 ? void 0 : _a.fullName) || "Unassigned",
+                        chefName: ((_b = booking.chefId) === null || _b === void 0 ? void 0 : _b.fullName) || "Unassigned",
+                        serviceName: ((_c = booking.serviceId) === null || _c === void 0 ? void 0 : _c.name) || "—",
+                        date: (0, bookingStatus_1.bestEffortBookingDate)(booking),
+                        guests: (0, bookingStatus_1.bestEffortGuestCount)(booking.bookingData),
+                        amount: (0, bookingStatus_1.minorToNaira)(((_d = booking.pricingSnapshot) === null || _d === void 0 ? void 0 : _d.estimatedTotalMinor) || 0),
+                        status: booking.status,
+                    });
+                }),
             },
         });
     }
     catch (error) {
+        console.error("Admin Dashboard Error:", error);
         return res.status(500).json({
             success: false,
-            message: "Failed to fetch admin",
+            message: "Failed to fetch admin dashboard",
             error,
         });
     }
@@ -219,7 +255,7 @@ exports.getAdminDashboard = getAdminDashboard;
 const updateAdmin = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { fullName, email, role, isActive, password } = req.body;
-        const admin = yield Admin_1.default.findById(req.params.id);
+        const admin = yield User_model_1.default.findOne({ _id: req.params.id, userType: "Admin" });
         if (!admin) {
             return res.status(404).json({
                 success: false,
@@ -231,7 +267,7 @@ const updateAdmin = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         if (email !== undefined)
             admin.email = email;
         if (role !== undefined)
-            admin.role = role;
+            admin.adminDetails = Object.assign(Object.assign({}, admin.adminDetails), { role });
         if (isActive !== undefined)
             admin.isActive = isActive;
         // Allow password update (will be hashed by pre-save hook)
@@ -239,12 +275,10 @@ const updateAdmin = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             admin.password = password;
         }
         yield admin.save();
-        const updatedAdmin = admin.toJSON();
-        // delete updatedAdmin.password;
         return res.status(200).json({
             success: true,
             message: "Admin updated successfully",
-            data: updatedAdmin,
+            payload: toAdminPayload(admin),
         });
     }
     catch (error) {
@@ -269,7 +303,7 @@ exports.updateAdmin = updateAdmin;
  */
 const deleteAdmin = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const admin = yield Admin_1.default.findByIdAndDelete(req.params.id);
+        const admin = yield User_model_1.default.findOneAndDelete({ _id: req.params.id, userType: "Admin" });
         if (!admin) {
             return res.status(404).json({
                 success: false,

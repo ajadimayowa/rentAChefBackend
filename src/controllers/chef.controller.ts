@@ -1,56 +1,87 @@
 import { Request, Response } from "express";
-import Chef from "../models/Chef";
+import User from "../models/User.model";
 import mongoose from "mongoose";
-import bcrypt from 'bcryptjs';
-import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
-import { sendLoginSuccessEmail, sendPasswordChangeSuccessEmail, sendUserPasswordResetOTPEmail } from "../services/email/rentAChef/usersEmailNotifs";
-import { sendChefCreationSuccessEmail } from "../services/email/rentAChef/chefsEmailNotification";
-import Category from "../models/Category";
+import { sendChefApprovedEmail, sendChefCreationSuccessEmail } from "../services/email/rentAChef/chefsEmailNotification";
 import { ChefService } from "../models/ChefService";
 import { BookingModel} from "../models/Booking";
-import { generateOtp } from "../utils/otpUtils";
 import { isChefAvailable } from "../utils/checkChefAvailability";
 import Menu from "../models/Menu";
+import { formatNigerianPhoneNumber, generateStaffId } from "../utils/otpUtils";
+import { generateEmailVerificationOtp } from "../services/auth/auth.service";
+import {
+  CLOSED_BOOKING_STATUSES,
+  bestEffortBookingDate,
+  bestEffortGuestCount,
+  minorToNaira,
+} from "../utils/bookingStatus";
 
+
+/**
+ * Services offered live in the ChefService collection, not on
+ * `chefDetails.servicesOffered` — this resolves the real assigned services for a
+ * batch of chefs and stitches them onto each chef's JSON so admin list/edit views
+ * (which only look at `chefDetails.servicesOffered`) see the actual selection.
+ */
+const attachServicesOffered = async (chefs: any[]): Promise<any[]> => {
+  const chefIds = chefs.map((c) => c._id);
+  const chefServices = await ChefService.find({ chefId: { $in: chefIds }, isAvailable: true }).lean();
+
+  const servicesByChef = new Map<string, string[]>();
+  for (const cs of chefServices) {
+    const key = cs.chefId.toString();
+    const list = servicesByChef.get(key) ?? [];
+    list.push(cs.serviceId.toString());
+    servicesByChef.set(key, list);
+  }
+
+  return chefs.map((c) => {
+    const obj = typeof c.toJSON === "function" ? c.toJSON() : c;
+    obj.chefDetails = { ...(obj.chefDetails || {}), servicesOffered: servicesByChef.get(c._id.toString()) ?? [] };
+    return obj;
+  });
+};
 
 export const createChef = async (req: Request, res: Response): Promise<any> => {
   try {
     const chefPic = req.file as any; // multer file
 
     const {
-      staffId,
       name,
       gender,
       email,
+      phone,
       bio,
-      phoneNumber,
+      dob,
       specialties,
-      location,
-      state,
       stateId,
+      stateName,
+      city,
       defaultPassword,
-      category,
       yearsOfExperience,
-      rating,
-      dob
+      chefLevel,
+      servicesOffered
     } = req.body;
+     const staffId = generateStaffId();
+
+     const fullName = name.trim();
+     const firstName = fullName.split(" ")[0];
+     const phoneNumber = formatNigerianPhoneNumber(phone);
 
     // console.log({ adminSent: req.body });
 
-    if (!staffId || !name || !email || !location || !state || !category) {
-      return res.status(400).json({ message: "staffId, category, location, state, name & email are required" });
+    if (!staffId || !fullName || !email || !city || !stateId || !phone) {
+      return res.status(400).json({ message: "city, state, phone number, name & email are required" });
     }
 
     // Check if chef already exists
-    const exists = await Chef.findOne({ $or: [{ email }, { staffId }] });
+    const exists = await User.findOne({ $or: [{ email }, { "chefDetails.staffId": staffId }] });
     if (exists) {
       return res.status(400).json({ message: "Chef already exists" });
     }
 
-    // Handle password
+    // Handle password (plaintext here — pre-save hook hashes it on create)
     const pass = defaultPassword || "Chef@123";
-    const hashedPassword = await bcrypt.hash(pass, 12);
 
     // // Parse specialties JSON
     // let specialtiesArray: string[] = [];
@@ -60,28 +91,34 @@ export const createChef = async (req: Request, res: Response): Promise<any> => {
     //     return res.status(400).json({ message: "Invalid specialties format. Should be an array of strings." });
     // }
 
-    //  const categoryName1 = await Category.findById(category).select("name");
     // Create chef
-    const chef = await Chef.create({
-      staffId,
-      name,
+    const chef = await User.create({
+      userType: "Chef",
+      isActive: false,
+      fullName,
+      firstName,
       gender,
       email,
-      bio,
-      specialties,
-      location,
-      state,
-      category,
-      stateId,
-      profilePic: chefPic?.location || chefPic?.path || "", // depending on S3 or local
       phoneNumber,
+      address: { stateId, stateName, city },
       dob,
+      password: pass,
+      chefDetails: {
+        staffId,
+        bio,
+        yearsOfExperience,
+        specialties,
+        chefLevel,
+        servicesOffered
+      },
+      profilePic: chefPic?.location || chefPic?.path || "", // depending on S3 or local
     });
 
     try {
       await sendChefCreationSuccessEmail({
         email,
-        firstName: name
+        firstName: fullName,
+        password: pass,
       })
     } catch (error) {
       console.log(error)
@@ -104,10 +141,13 @@ export const createChef = async (req: Request, res: Response): Promise<any> => {
         dupCount = results.filter((r: any) => r.status === 'rejected' && r.reason && r.reason.code === 11000).length;
       }
 
+      const [payload] = await attachServicesOffered([chef]);
+
       return res.status(201).json({
+        success: true,
         message: "Chef created successfully",
+        payload,
         defaultPassword: pass,
-        chef,
         chefServicesCreated: createdServices,
         chefServicesDuplicatesSkipped: dupCount
       });
@@ -115,9 +155,10 @@ export const createChef = async (req: Request, res: Response): Promise<any> => {
     } catch (err) {
       console.warn('Failed to create chef services:', err);
       return res.status(201).json({
+        success: true,
         message: "Chef created successfully (services creation failed)",
-        defaultPassword: pass,
-        chef
+        payload: chef,
+        defaultPassword: pass
       });
     }
 
@@ -126,143 +167,6 @@ export const createChef = async (req: Request, res: Response): Promise<any> => {
     return res.status(500).json({ message: "Error creating chef", error });
   }
 };
-
-export const loginChef = async (req: Request, res: Response): Promise<any> => {
-  try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ message: "Email and password are required" });
-    }
-
-    const chef = await Chef.findOne({ email });
-
-    if (!chef) {
-      return res.status(404).json({ message: "Chef not found" });
-    }
-
-    const isMatch = await bcrypt.compare(password, chef.password as string);
-
-    if (!isMatch) {
-      return res.status(401).json({ message: "Invalid password" });
-    }
-
-    // Generate JWT token
-    const token = jwt.sign(
-      { id: chef._id, email: chef.email, staffId: chef.staffId },
-      process.env.JWT_SECRET || "your_jwt_secret",
-      { expiresIn: "7d" }
-    );
-
-    return res.status(200).json({
-      success: true,
-      message: "Login successful",
-      token,
-      payload: {
-        id: chef._id,
-        staffId: chef.staffId,
-        name: chef.name,
-        email: chef.email,
-        profilePic: chef.profilePic,
-        isActive: chef.isActive
-      }
-    });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Error logging in chef", error });
-  }
-};
-
-/**
- * REQUEST PASSWORD CHANGE OTP
- */
-export const requestChefPasswordChangeOtp = async (req: Request, res: Response): Promise<any> => {
-  try {
-    const { email } = req.body;
-
-    const chef = await Chef.findOne({ email });
-    if (!chef) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    const otp = generateOtp();
-
-    chef.loginOtp = otp;
-    chef.loginOtpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
-    await chef.save();
-
-    // await sendEmail(
-    //   user.email,
-    //   'Password Reset OTP',
-    //   `Your password reset OTP is ${otp}. It expires in 10 minutes.`
-    // );
-
-    // Send OTP via email
-    try {
-      await sendUserPasswordResetOTPEmail({
-        firstName: chef.name,
-        email: chef.email,
-        loginOtp: otp,
-      });
-    } catch (error) {
-      console.error("Error sending OTP email:", error);
-      // Don't block login flow if email fails, just log it
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: 'Password reset OTP sent to email',
-    });
-  } catch (error) {
-    return res.status(500).json({ message: 'Server error' });
-  }
-};
-
-export const changeChefPasswordWithOtp = async (req: Request, res: Response): Promise<any> => {
-  try {
-    const { email, otp, newPassword } = req.body;
-
-    const chef = await Chef.findOne({ email });
-    if (!chef || !chef.loginOtp || !chef.loginOtpExpires) {
-      return res.status(400).json({ message: 'Invalid request' });
-    }
-
-    if (chef.loginOtp !== otp) {
-      return res.status(400).json({ message: 'Invalid OTP' });
-    }
-
-    if (chef.loginOtpExpires < new Date()) {
-      return res.status(400).json({ message: 'OTP expired' });
-    }
-
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-    chef.password = hashedPassword;
-
-    // clear otp
-    chef.loginOtp = undefined;
-    chef.loginOtpExpires = undefined;
-
-    await chef.save();
-
-    try {
-      await sendPasswordChangeSuccessEmail({
-        firstName: chef.name,
-        email: chef.name,
-      });
-    } catch (error) {
-      console.log(error)
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: 'Password changed successfully',
-    });
-  } catch (error) {
-    return res.status(500).json({ message: 'Server error' });
-  }
-};
-
-
 
 export const getAllChefs = async (req: Request, res: Response): Promise<any> => {
   try {
@@ -287,20 +191,19 @@ export const getAllChefs = async (req: Request, res: Response): Promise<any> => 
 
     const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-    const location = getQueryValue("location", "lga");
+    const city = getQueryValue("location", "lga", "city", "long", "lat");
     const state = getQueryValue("state", "stateName");
     const isActiveQuery = getQueryValue("isActive", "active");
     const name = getQueryValue("name", "search", "q");
-    const category = getQueryValue("category", "categoryId", "categoryName", "chefCategoryId");
 
-    const filter: any = {};
+    const filter: any = { userType: "Chef" };
 
-    if (location) {
-      filter.location = { $regex: escapeRegex(location), $options: "i" };
+    if (city) {
+      filter["address.city"] = { $regex: escapeRegex(city), $options: "i" };
     }
 
     if (state) {
-      filter.state = { $regex: escapeRegex(state), $options: "i" };
+      filter["address.stateName"] = { $regex: escapeRegex(state), $options: "i" };
     }
 
     if (isActiveQuery !== undefined) {
@@ -314,47 +217,21 @@ export const getAllChefs = async (req: Request, res: Response): Promise<any> => 
 
     // 🔍 Search by chef name (case-insensitive, partial match)
     if (name) {
-      filter.name = { $regex: escapeRegex(name), $options: "i" };
-    }
-
-    if (category) {
-      const categoryQuery = String(category).trim();
-
-      if (mongoose.Types.ObjectId.isValid(categoryQuery)) {
-        filter.category = categoryQuery;
-      } else {
-        const escapedCategory = escapeRegex(categoryQuery);
-        const matchedCategory = await Category.findOne({
-          name: { $regex: `^${escapedCategory}$`, $options: "i" },
-        }).select("_id");
-
-        if (!matchedCategory) {
-          return res.status(200).json({
-            success: true,
-            meta: {
-              total: 0,
-              page,
-              limit,
-              totalPages: 0,
-            },
-            payload: [],
-          });
-        }
-
-        filter.category = matchedCategory._id;
-      }
+      filter.fullName = { $regex: escapeRegex(name), $options: "i" };
     }
 
     // Query
     const [chefs, total] = await Promise.all([
-      Chef.find(filter)
-        .populate("category name")
+      User.find(filter)
         .select("-password")
+        .populate("chefDetails.chefLevel", "name description")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit),
-      Chef.countDocuments(filter),
+      User.countDocuments(filter),
     ]);
+
+    const payload = await attachServicesOffered(chefs);
 
     return res.status(200).json({
       success: true,
@@ -364,7 +241,7 @@ export const getAllChefs = async (req: Request, res: Response): Promise<any> => 
         limit,
         totalPages: Math.ceil(total / limit),
       },
-      payload: chefs,
+      payload,
     });
   } catch (error) {
     return res.status(500).json({
@@ -387,9 +264,9 @@ export const getChefById = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    const chef = await Chef.findById(id)
+    const chef = await User.findOne({ _id: id, userType: "Chef" })
       .select("-password") // ✅ exclude password
-      .populate('category', 'name')
+      .populate("chefDetails.chefLevel", "name description");
 
     if (!chef) {
       res.status(404).json({ success: false, message: "Chef not found" });
@@ -397,11 +274,10 @@ export const getChefById = async (req: Request, res: Response): Promise<void> =>
     }
 
     // compute booking counts
-    const now = new Date();
     const [totalChefBooking, totalCompletedBooking, totalUpcoming] = await Promise.all([
       BookingModel.countDocuments({ chefId: id }),
-      BookingModel.countDocuments({ chefId: id, status: 'completed' }),
-      BookingModel.countDocuments({ chefId: id, status: { $in: ['confirmed', 'ongoing'] }, startDate: { $gte: now } }),
+      BookingModel.countDocuments({ chefId: id, status: 'Completed' }),
+      BookingModel.countDocuments({ chefId: id, status: { $nin: CLOSED_BOOKING_STATUSES } }),
     ]);
 
     // fetch recent menus for this chef (last 3)
@@ -432,7 +308,104 @@ export const getChefById = async (req: Request, res: Response): Promise<void> =>
   }
 };
 
+// ✅ Chef's own dashboard summary (auth required — reads the logged-in chef)
+export const getChefDashboard = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const chefId = (req as any).user?._id;
 
+    const [jobsCompleted, upcomingBookingsCount, earningsAgg, upcomingBookingsRaw] = await Promise.all([
+      BookingModel.countDocuments({ chefId, status: "Completed" }),
+      BookingModel.countDocuments({ chefId, status: { $nin: CLOSED_BOOKING_STATUSES } }),
+      BookingModel.aggregate([
+        { $match: { chefId: new mongoose.Types.ObjectId(chefId), paymentStatus: "Paid" } },
+        { $group: { _id: null, total: { $sum: { $ifNull: ["$pricingSnapshot.estimatedTotalMinor", 0] } } } },
+      ]),
+      BookingModel.find({ chefId, status: { $nin: CLOSED_BOOKING_STATUSES } })
+        .select("bookingNumber customerId serviceId status pricingSnapshot startDate bookingData createdAt")
+        .populate("customerId", "fullName")
+        .populate("serviceId", "name")
+        .sort({ createdAt: -1 })
+        .limit(5),
+    ]);
+
+    const chef = (req as any).user;
+
+    return res.status(200).json({
+      success: true,
+      payload: {
+        metrics: {
+          upcomingBookings: upcomingBookingsCount,
+          jobsCompleted,
+          rating: chef?.chefDetails?.rating || 0,
+          lifetimeEarnings: minorToNaira(earningsAgg?.[0]?.total || 0),
+        },
+        upcomingBookings: upcomingBookingsRaw.map((booking: any) => ({
+          id: booking._id,
+          bookingNumber: booking.bookingNumber,
+          customerName: booking.customerId?.fullName || "Unassigned",
+          serviceName: booking.serviceId?.name || "—",
+          date: bestEffortBookingDate(booking),
+          guests: bestEffortGuestCount(booking.bookingData),
+          amount: minorToNaira(booking.pricingSnapshot?.estimatedTotalMinor || 0),
+          status: booking.status,
+        })),
+      },
+    });
+  } catch (error) {
+    console.error("Chef Dashboard Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error fetching chef dashboard",
+      error,
+    });
+  }
+};
+
+// ✅ Chef's own booking list (auth required — scoped to the logged-in chef)
+export const getChefBookings = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const chefId = (req as any).user?._id;
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const limit = Math.max(Number(req.query.limit) || 10, 1);
+    const skip = (page - 1) * limit;
+
+    const status = req.query.status as string | undefined;
+    const filter: any = { chefId };
+    if (status && status !== "all") filter.status = status;
+
+    const [bookings, total] = await Promise.all([
+      BookingModel.find(filter)
+        .select("bookingNumber customerId serviceId workflow status paymentStatus pricingSnapshot startDate bookingData createdAt")
+        .populate("customerId", "fullName")
+        .populate("serviceId", "name")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      BookingModel.countDocuments(filter),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) || 1 },
+      payload: bookings.map((b: any) => ({
+        id: b._id,
+        bookingNumber: b.bookingNumber,
+        customerName: b.customerId?.fullName || "Unassigned",
+        serviceName: b.serviceId?.name || "—",
+        workflow: b.workflow,
+        status: b.status,
+        paymentStatus: b.paymentStatus,
+        date: bestEffortBookingDate(b),
+        guests: bestEffortGuestCount(b.bookingData),
+        amount: minorToNaira(b.pricingSnapshot?.estimatedTotalMinor || 0),
+        createdAt: b.createdAt,
+      })),
+    });
+  } catch (error) {
+    console.error("Get Chef Bookings Error:", error);
+    return res.status(500).json({ success: false, message: "Error fetching bookings", error });
+  }
+};
 
 // ✅ Update Chef (Admin OR Chef owner)
 export const updateChef = async (req: Request, res: Response): Promise<any> => {
@@ -447,62 +420,85 @@ export const updateChef = async (req: Request, res: Response): Promise<any> => {
     /**
      * ✅ Whitelisted fields
      * Prevent updating sensitive fields like password, isActive, staffId, etc.
+     * (password intentionally excluded — password changes must go through the
+     * dedicated OTP flow so they're hashed correctly)
      */
-    const allowedUpdates = [
-      "name",
-      "gender",
-      "email",
+    const topLevelUpdates = ["gender", "email", "profilePic", "dob", "phoneNumber"];
+    const chefDetailUpdates = [
       "bio",
       "specialties",
-      "category",
-      "phoneNumber",
-      "location",
-      "state",
-      "stateId",
+      "rating",
       "staffId",
-      "profilePic",
-      "dob",
       "yearsOfExperience",
-      "password",
-      "rating"
+      "chefLevel",
     ];
+    const addressUpdates = ["stateId", "stateName", "city"];
 
     const updates: Record<string, any> = {};
 
-    for (const key of allowedUpdates) {
+    if (req.body.name !== undefined) {
+      updates.fullName = req.body.name;
+    }
+
+    for (const key of topLevelUpdates) {
       if (req.body[key] !== undefined) {
         updates[key] = req.body[key];
       }
     }
 
-    // ✅ If category is updated, also update categoryName
-    if (updates.category) {
-      if (!mongoose.Types.ObjectId.isValid(updates.category)) {
-        return res.status(400).json({ success: false, message: "Invalid category ID" });
-      }
-
-      const category = await Category.findById(updates.category).select("name");
-
-      if (!category) {
-        return res.status(404).json({ success: false, message: "Category not found" });
-      }
-
-      updates.categoryName = category.name;
+    // ✅ Picture upload (multer-s3) takes precedence over any profilePic string in the body
+    const chefPic = req.file as any;
+    if (chefPic) {
+      updates.profilePic = chefPic.location || chefPic.path;
     }
 
-    const chef = await Chef.findByIdAndUpdate(id, updates, {
+    for (const key of chefDetailUpdates) {
+      if (req.body[key] !== undefined) {
+        updates[`chefDetails.${key}`] = req.body[key];
+      }
+    }
+
+    for (const key of addressUpdates) {
+      if (req.body[key] !== undefined) {
+        updates[`address.${key}`] = req.body[key];
+      }
+    }
+
+    const chef = await User.findOneAndUpdate({ _id: id, userType: "Chef" }, updates, {
       new: true,
       runValidators: true,
-    }).populate("category", "name").select("-password");
+    }).select("-password");
 
     if (!chef) {
       return res.status(404).json({ success: false, message: "Chef not found" });
     }
 
+    // Services offered live in the ChefService collection (see createChef) —
+    // reconcile it here too, otherwise edits to "services offered" are silently dropped.
+    const { serviceId, serviceIds } = req.body as any;
+    const nextServiceIds: string[] | undefined = Array.isArray(serviceIds) ?
+    serviceIds :
+    serviceId ? [serviceId] : undefined;
+
+    if (nextServiceIds !== undefined) {
+      await ChefService.deleteMany({ chefId: chef._id, serviceId: { $nin: nextServiceIds } });
+      await Promise.allSettled(
+        nextServiceIds.map((sid: string) =>
+        ChefService.updateOne(
+          { chefId: chef._id, serviceId: sid },
+          { $set: { isAvailable: true } },
+          { upsert: true }
+        )
+        )
+      );
+    }
+
+    const [payload] = await attachServicesOffered([chef]);
+
     return res.status(200).json({
       success: true,
       message: "Chef updated successfully",
-      payload: chef,
+      payload,
     });
 
   } catch (error: any) {
@@ -517,11 +513,71 @@ export const updateChef = async (req: Request, res: Response): Promise<any> => {
 
 
 
+// ✅ Update chef approval status (ADMIN only)
+export const updateChefStatus = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body as { status?: string };
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: "Invalid chef ID" });
+    }
+
+    const allowedStatuses = ["pending", "approved", "suspended", "rejected"];
+    if (!status || !allowedStatuses.includes(status)) {
+      return res.status(400).json({ success: false, message: "Invalid status" });
+    }
+
+    const chef = await User.findOne({ _id: id, userType: "Chef" });
+    if (!chef) {
+      return res.status(404).json({ success: false, message: "Chef not found" });
+    }
+
+    const isApproving = status === "approved";
+    chef.isActive = isApproving;
+
+    // Only issue a fresh verification link the first time a chef is approved —
+    // a chef reinstated after suspension has already verified their email.
+    const needsVerificationEmail = isApproving && !chef.isEmailVerified;
+    if (needsVerificationEmail) {
+      chef.emailVerificationOtp = generateEmailVerificationOtp();
+    }
+
+    await chef.save();
+
+    if (needsVerificationEmail) {
+      try {
+        const verifyUrl = `${process.env.CLIENT_URL}/verify-email?email=${encodeURIComponent(chef.email)}&otp=${encodeURIComponent(chef.emailVerificationOtp || "")}`;
+        await sendChefApprovedEmail({
+          firstName: chef.firstName,
+          email: chef.email,
+          verifyUrl,
+        });
+      } catch (error) {
+        console.error("Failed to send chef approval email:", error);
+      }
+    }
+
+    const payload = await User.findById(chef._id)
+      .select("-password")
+      .populate("chefDetails.chefLevel", "name description");
+
+    return res.status(200).json({
+      success: true,
+      message: "Chef status updated",
+      payload,
+    });
+  } catch (error) {
+    console.error("Update Chef Status Error:", error);
+    return res.status(500).json({ success: false, message: "Error updating chef status", error });
+  }
+};
+
 // ✅ Disable Chef (ADMIN only)
 export const disableChef = async (req: Request, res: Response): Promise<any> => {
   try {
-    const chef = await Chef.findByIdAndUpdate(
-      req.params.id,
+    const chef = await User.findOneAndUpdate(
+      { _id: req.params.id, userType: "Chef" },
       { isActive: false },
       { new: true }
     );
@@ -545,7 +601,7 @@ export const disableChef = async (req: Request, res: Response): Promise<any> => 
 // ✅ Delete Chef (ADMIN only)
 export const deleteChef = async (req: Request, res: Response): Promise<any> => {
   try {
-    const chef = await Chef.findByIdAndDelete(req.params.id);
+    const chef = await User.findOneAndDelete({ _id: req.params.id, userType: "Chef" });
 
     if (!chef) {
       return res.status(404).json({ message: "Chef not found" });

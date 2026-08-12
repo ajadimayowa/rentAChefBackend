@@ -42,6 +42,7 @@ var ModeOfPayment;
 (function (ModeOfPayment) {
     ModeOfPayment["PAYSTACK"] = "Paystack";
     ModeOfPayment["TRANSFER"] = "Transfer";
+    ModeOfPayment["CASH"] = "Cash";
     ModeOfPayment["UNPAID"] = "Unpaid";
 })(ModeOfPayment || (exports.ModeOfPayment = ModeOfPayment = {}));
 var ProcurementOption;

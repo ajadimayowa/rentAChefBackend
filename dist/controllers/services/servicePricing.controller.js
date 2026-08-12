@@ -140,7 +140,7 @@ const getServicePricings = (req, res) => __awaiter(void 0, void 0, void 0, funct
             filters.isActive = String(isActive) === "true";
         const servicePricings = yield ServicePricing_1.ServicePricing.find(filters)
             .populate("serviceId", "name code")
-            .populate("specialServiceId", "name slug description")
+            .populate("specialServiceId", "title description")
             .populate("chefCategoryId", "name slug description tasks")
             .sort({ createdAt: -1 });
         res.status(200).json({ success: true, data: servicePricings });
@@ -160,7 +160,7 @@ const getServicePricingById = (req, res) => __awaiter(void 0, void 0, void 0, fu
         }
         const servicePricing = yield ServicePricing_1.ServicePricing.findById(id)
             .populate("serviceId", "name code")
-            .populate("specialServiceId", "name slug")
+            .populate("specialServiceId", "title description")
             .populate("chefCategoryId", "name slug");
         if (!servicePricing) {
             return res.status(404).json({ success: false, message: "ServicePricing not found" });

@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const termsAndCon_controller_1 = require("../controllers/termsAndCon/termsAndCon.controller");
+const adminAuth_middleware_1 = require("../middleware/auth/adminAuth.middleware");
 const router = (0, express_1.Router)();
 /**
  * @openapi
@@ -24,7 +25,7 @@ const router = (0, express_1.Router)();
  *             schema:
  *               $ref: '#/components/schemas/TermsAndConResponse'
  */
-router.post("/terms-and-con/create", termsAndCon_controller_1.createTermsAndCon);
+router.post("/terms-and-con/create", adminAuth_middleware_1.requireAdminAuth, termsAndCon_controller_1.createTermsAndCon);
 /**
  * @openapi
  * /terms-and-con/records:
@@ -111,7 +112,7 @@ router.get("/terms-and-con/:id", termsAndCon_controller_1.getTermsAndConById);
  *             schema:
  *               $ref: '#/components/schemas/TermsAndConResponse'
  */
-router.put("/terms-and-con/:id", termsAndCon_controller_1.updateTermsAndCon);
+router.put("/terms-and-con/:id", adminAuth_middleware_1.requireAdminAuth, termsAndCon_controller_1.updateTermsAndCon);
 /**
  * @openapi
  * /terms-and-con/{id}:
@@ -133,5 +134,5 @@ router.put("/terms-and-con/:id", termsAndCon_controller_1.updateTermsAndCon);
  *             schema:
  *               $ref: '#/components/schemas/TermsAndConDeleteResponse'
  */
-router.delete("/terms-and-con/:id", termsAndCon_controller_1.deleteTermsAndCon);
+router.delete("/terms-and-con/:id", adminAuth_middleware_1.requireAdminAuth, termsAndCon_controller_1.deleteTermsAndCon);
 exports.default = router;

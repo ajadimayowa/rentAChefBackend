@@ -156,7 +156,7 @@ const Menu = new Schema<IMenu>(
 
     chefId: {
     type: Schema.Types.ObjectId,
-    ref: "Chef",
+    ref: "User",
     required: function (this: IMenu) {
         return this.menuCreatorType === "chef";
     },

@@ -5,6 +5,13 @@ export interface IPackage extends Document {
     description: string;
     packageImage?: string;
 
+    price: number;
+    durationHours: number;
+    guests: number;
+    perks: string[];
+    isActive: boolean;
+
+    serviceIds: Types.ObjectId[];
     menus: Types.ObjectId[];
 
     createdAt: Date;
@@ -29,6 +36,41 @@ const PackageSchema = new Schema<IPackage>(
             type: String,
             default: null,
         },
+
+        price: {
+            type: Number,
+            required: true,
+            min: 0,
+        },
+
+        durationHours: {
+            type: Number,
+            required: true,
+            min: 0,
+        },
+
+        guests: {
+            type: Number,
+            required: true,
+            min: 1,
+        },
+
+        perks: {
+            type: [String],
+            default: [],
+        },
+
+        isActive: {
+            type: Boolean,
+            default: true,
+        },
+
+        serviceIds: [
+            {
+                type: Schema.Types.ObjectId,
+                ref: "Service",
+            },
+        ],
 
         menus: [
             {

@@ -7,7 +7,7 @@ import swaggerUi from 'swagger-ui-express';
 import swaggerSpec from './docs/swagger';
 
 import stateRoutes from './routes/stateRoutes'
-import authRoutes from './routes/auth.routes'
+import authRoutes from './routes/auth'
 import adminRoutes from './routes/admin.routes'
 import chefRoutes from './routes/chef.route'
 import categoryRoutes from './routes/category.routes';
@@ -31,6 +31,7 @@ import bookingRoutes from './routes/booking.routes';
 import packageRoutes from './routes/package.routes';
 import menuTypesRoutes from './routes/menuTypes.routes';
 import assignedBookingNumberRoutes from './routes/assignedBookingNumber.routes';
+import { verifyEmailTransport } from './services/email/emailService';
 
 
 dotenv.config();
@@ -40,6 +41,10 @@ connectDB().catch((err) => {
   console.error('Failed to connect to DB:', err.message);
   process.exit(1);
 });
+
+// Non-fatal: logs clearly at boot if SMTP auth/connectivity is broken instead of
+// only surfacing as a failed send later.
+verifyEmailTransport();
 
 const app = express();
 

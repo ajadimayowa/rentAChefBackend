@@ -38,6 +38,31 @@ const router = Router();
  *         packageImage:
  *           type: string
  *           example: https://cdn.alase.com/packages/family-feast.jpg
+ *         price:
+ *           type: number
+ *           example: 62000
+ *         durationHours:
+ *           type: number
+ *           example: 4
+ *         guests:
+ *           type: number
+ *           example: 8
+ *         perks:
+ *           type: array
+ *           items:
+ *             type: string
+ *           example:
+ *             - Wine pairing notes
+ *             - Table styling
+ *         isActive:
+ *           type: boolean
+ *           example: true
+ *         serviceIds:
+ *           type: array
+ *           items:
+ *             type: string
+ *           example:
+ *             - 6869b3a83ab9c5fcb50f92d1
  *         menus:
  *           type: array
  *           items:
@@ -64,6 +89,9 @@ const router = Router();
  *             required:
  *               - title
  *               - description
+ *               - price
+ *               - durationHours
+ *               - guests
  *             properties:
  *               title:
  *                 type: string
@@ -71,6 +99,33 @@ const router = Router();
  *               description:
  *                 type: string
  *                 example: Complete package suitable for families.
+ *               price:
+ *                 type: number
+ *                 example: 62000
+ *               durationHours:
+ *                 type: number
+ *                 example: 4
+ *               guests:
+ *                 type: number
+ *                 example: 8
+ *               perks:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Comma-repeated fields, or a JSON-array string.
+ *               isActive:
+ *                 type: boolean
+ *                 example: true
+ *               serviceIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Services included in this package.
+ *               menus:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Menus included in this package.
  *               packageImage:
  *                 type: string
  *                 format: binary
@@ -144,6 +199,26 @@ router.get("/package/:id", getPackage);
  *               description:
  *                 type: string
  *                 example: Updated package description.
+ *               price:
+ *                 type: number
+ *               durationHours:
+ *                 type: number
+ *               guests:
+ *                 type: number
+ *               perks:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *               isActive:
+ *                 type: boolean
+ *               serviceIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *               menus:
+ *                 type: array
+ *                 items:
+ *                   type: string
  *               packageImage:
  *                 type: string
  *                 format: binary

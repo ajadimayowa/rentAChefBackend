@@ -11,7 +11,7 @@ export interface IClientRating extends Document {
 
 const ClientRatingSchema = new Schema<IClientRating>(
   {
-    chefId: { type: Schema.Types.ObjectId, ref: 'Chef', required: true },
+    chefId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     clientId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     bookingId: { type: Schema.Types.ObjectId, ref: 'Booking', required: true },
     rating: { type: Number, required: true, min: 1, max: 5 },

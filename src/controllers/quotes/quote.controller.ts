@@ -6,7 +6,7 @@ const getRequestUser = (req: Request): any => (req as any).user;
 
 const isAdminUser = (user: any): boolean => {
     if (!user) return false;
-    return user.isAdmin === true || user.role === "ADMIN";
+    return user.userType === "Admin";
 };
 
 // CREATE QUOTE

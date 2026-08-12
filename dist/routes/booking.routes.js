@@ -2,6 +2,8 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const booking_controller_1 = require("../controllers/booking.controller");
+const bookingDetail_controller_1 = require("../controllers/bookingDetail.controller");
+const auth_middleware_1 = require("../middleware/auth.middleware");
 const router = (0, express_1.Router)();
 /**
  * @openapi
@@ -80,6 +82,28 @@ router.post('/bookings', booking_controller_1.createBooking);
  *               $ref: '#/components/schemas/CPBookingsResponse'
  */
 router.get('/bookings', booking_controller_1.listBookings);
+/**
+ * @openapi
+ * /bookings/{id}:
+ *   get:
+ *     tags:
+ *       - Chef Platform
+ *     summary: Get a single booking — shared by the admin/chef/customer "view booking" pages. Admins can view any booking; chefs and customers only their own.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: OK
+ *       403:
+ *         description: Not the booking's chef/customer, and not an admin
+ *       404:
+ *         description: Booking not found
+ */
+router.get('/bookings/:id', auth_middleware_1.verifyUserToken, bookingDetail_controller_1.getBookingDetail);
 /**
  * @openapi
  * /quotations:

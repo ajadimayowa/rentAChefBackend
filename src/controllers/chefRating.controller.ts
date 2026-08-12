@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { ChefRating } from '../models/ChefRating';
-import Chef from '../models/Chef';
+import User from '../models/User.model';
 import { BookingModel } from '../models/Booking';
 
 export const addOrUpdateChefRating = async (req: Request, res: Response): Promise<any> => {
@@ -11,7 +11,7 @@ export const addOrUpdateChefRating = async (req: Request, res: Response): Promis
     const { chefId } = req.params;
     const { rating, review, bookingId } = req.body;
 
-    const chef = await Chef.findById(chefId);
+    const chef = await User.findOne({ _id: chefId, userType: 'Chef' });
     if (!chef) return res.status(404).json({ success: false, message: 'Chef not found' });
 
     if (!bookingId) return res.status(400).json({ success: false, message: 'bookingId is required' });
@@ -49,7 +49,7 @@ export const addOrUpdateChefRating = async (req: Request, res: Response): Promis
     try {
       const all = await ChefRating.find({ chefId });
       const avg = all.length ? all.reduce((s, x) => s + x.rating, 0) / all.length : 0;
-      await Chef.findByIdAndUpdate(chefId, { rating: avg });
+      await User.findByIdAndUpdate(chefId, { rating: avg });
     } catch (e) {
       console.warn('Failed to update chef average rating:', e);
     }

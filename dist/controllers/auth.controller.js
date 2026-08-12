@@ -15,7 +15,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.whoami = void 0;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const User_model_1 = __importDefault(require("../models/User.model"));
-const Chef_1 = __importDefault(require("../models/Chef"));
 const whoami = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const authHeader = req.headers.authorization;
@@ -23,16 +22,10 @@ const whoami = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             return res.status(401).json({ success: false, message: 'No token provided' });
         const token = authHeader.split(' ')[1];
         const decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET);
-        if (decoded.role === 'chef') {
-            const chef = yield Chef_1.default.findById(decoded.id).select('-password');
-            if (!chef)
-                return res.status(404).json({ success: false, message: 'Chef not found' });
-            return res.json({ success: true, payload: { role: 'chef', user: chef } });
-        }
         const user = yield User_model_1.default.findById(decoded.id).select('-password');
         if (!user)
             return res.status(404).json({ success: false, message: 'User not found' });
-        return res.json({ success: true, payload: { role: 'user', user } });
+        return res.json({ success: true, payload: { role: user.userType.toLowerCase(), user } });
     }
     catch (err) {
         return res.status(401).json({ success: false, message: 'Invalid token', error: err.message });
