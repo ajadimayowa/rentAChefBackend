@@ -34,6 +34,9 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             console.error(err);
         }
         try {
+            // Customers can register from the mobile app or the web, so the emailed
+            // link opens the web verification page (works from any device/client);
+            // that page also offers an "open in app" deep link for mobile users.
             const verifyUrl = `${process.env.CLIENT_URL}/verify-email?email=${encodeURIComponent(user.email)}&otp=${encodeURIComponent(emailVerificationOtp)}`;
             yield (0, usersEmailNotifs_1.sendWelcomeEmail)({
                 firstName: user.firstName || '',

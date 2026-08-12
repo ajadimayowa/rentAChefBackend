@@ -280,7 +280,7 @@ const completeKyc = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     }
     try {
         const updatedUser = yield User_model_1.default.findByIdAndUpdate(userId, {
-            "customerDetails.kyc": { idType, idNumber, idPicture: (idPic === null || idPic === void 0 ? void 0 : idPic.location) || (idPic === null || idPic === void 0 ? void 0 : idPic.path) || "", },
+            kyc: { idType, idNumber, idPicture: (idPic === null || idPic === void 0 ? void 0 : idPic.location) || (idPic === null || idPic === void 0 ? void 0 : idPic.path) || "", isVerified: false },
         }, { new: true, runValidators: true });
         if (!updatedUser) {
             return res.status(404).json({ message: 'User not found' });
@@ -324,7 +324,7 @@ const updateNok = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     }
     try {
         const updatedUser = yield User_model_1.default.findByIdAndUpdate(userId, {
-            "customerDetails.nok": { fullName, phone, relationship },
+            nok: { fullName, phone, relationship },
         }, { new: true, runValidators: true });
         if (!updatedUser) {
             return res.status(404).json({ success: false, message: 'User not found' });
@@ -346,7 +346,12 @@ const updateLocation = (req, res) => __awaiter(void 0, void 0, void 0, function*
     }
     try {
         const updatedUser = yield User_model_1.default.findByIdAndUpdate(userId, {
-            "customerDetails.location": { home, office, state, city, long, lat },
+            "address.homeAddress": home,
+            "address.officeAddress": office,
+            "address.stateName": state,
+            "address.city": city,
+            "address.long": long,
+            "address.lat": lat,
         }, { new: true, runValidators: true });
         if (!updatedUser) {
             return res.status(404).json({ success: false, message: 'User not found' });

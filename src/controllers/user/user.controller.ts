@@ -301,7 +301,7 @@ export const completeKyc = async (req: Request, res: Response): Promise<any> => 
     const updatedUser = await UserModel.findByIdAndUpdate(
       userId,
       {
-        "customerDetails.kyc": { idType, idNumber, idPicture: idPic?.location || idPic?.path || "", },
+        kyc: { idType, idNumber, idPicture: idPic?.location || idPic?.path || "", isVerified: false },
       },
       { new: true, runValidators: true }
     );
@@ -359,7 +359,7 @@ export const updateNok = async (req: Request, res: Response): Promise<any> => {
     const updatedUser = await UserModel.findByIdAndUpdate(
       userId,
       {
-        "customerDetails.nok": { fullName, phone, relationship },
+        nok: { fullName, phone, relationship },
       },
       { new: true, runValidators: true }
     );
@@ -388,7 +388,12 @@ export const updateLocation = async (req: Request, res: Response): Promise<any> 
     const updatedUser = await UserModel.findByIdAndUpdate(
       userId,
       {
-        "customerDetails.location": { home, office, state, city, long, lat },
+        "address.homeAddress": home,
+        "address.officeAddress": office,
+        "address.stateName": state,
+        "address.city": city,
+        "address.long": long,
+        "address.lat": lat,
       },
       { new: true, runValidators: true }
     );

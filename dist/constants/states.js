@@ -684,31 +684,6 @@ exports.statesData = [
         ]
     },
     {
-        id: 30,
-        state: "Rivers",
-        localGovernmentAreas: [
-            "Abua/Odual",
-            "Ahoada East",
-            "Ahoada West",
-            "Akuku Toru",
-            "Andoni",
-            "Asari-Toru",
-            "Bonny",
-            "Degema",
-            "Emohua",
-            "Etche",
-            "Gokana",
-            "Ikwerre",
-            "Khana",
-            "Obio/Akpor",
-            "Ogba/Egbema/Ndoni",
-            "Ogu/Bolo",
-            "Okrika",
-            "Port Harcourt",
-            "Tai"
-        ]
-    },
-    {
         id: 31,
         state: "Sokoto",
         localGovernmentAreas: [
