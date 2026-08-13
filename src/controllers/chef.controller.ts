@@ -313,13 +313,10 @@ export const getChefDashboard = async (req: Request, res: Response): Promise<any
   try {
     const chefId = (req as any).user?._id;
 
-    const [jobsCompleted, upcomingBookingsCount, earningsAgg, upcomingBookingsRaw] = await Promise.all([
+    const [jobsCompleted, upcomingBookingsCount, menusCreated, upcomingBookingsRaw] = await Promise.all([
       BookingModel.countDocuments({ chefId, status: "Completed" }),
       BookingModel.countDocuments({ chefId, status: { $nin: CLOSED_BOOKING_STATUSES } }),
-      BookingModel.aggregate([
-        { $match: { chefId: new mongoose.Types.ObjectId(chefId), paymentStatus: "Paid" } },
-        { $group: { _id: null, total: { $sum: { $ifNull: ["$pricingSnapshot.estimatedTotalMinor", 0] } } } },
-      ]),
+      Menu.countDocuments({ chefId }),
       BookingModel.find({ chefId, status: { $nin: CLOSED_BOOKING_STATUSES } })
         .select("bookingNumber customerId serviceId status pricingSnapshot startDate bookingData createdAt")
         .populate("customerId", "fullName")
@@ -337,7 +334,7 @@ export const getChefDashboard = async (req: Request, res: Response): Promise<any
           upcomingBookings: upcomingBookingsCount,
           jobsCompleted,
           rating: chef?.chefDetails?.rating || 0,
-          lifetimeEarnings: minorToNaira(earningsAgg?.[0]?.total || 0),
+          menusCreated,
         },
         upcomingBookings: upcomingBookingsRaw.map((booking: any) => ({
           id: booking._id,
@@ -422,16 +419,18 @@ export const updateChef = async (req: Request, res: Response): Promise<any> => {
      * Prevent updating sensitive fields like password, isActive, staffId, etc.
      * (password intentionally excluded — password changes must go through the
      * dedicated OTP flow so they're hashed correctly)
+     *
+     * A chef editing their own record (as opposed to an admin) gets a narrower
+     * whitelist — email, rating, staffId and chefLevel stay admin-managed.
      */
-    const topLevelUpdates = ["gender", "email", "profilePic", "dob", "phoneNumber"];
-    const chefDetailUpdates = [
-      "bio",
-      "specialties",
-      "rating",
-      "staffId",
-      "yearsOfExperience",
-      "chefLevel",
-    ];
+    const isSelfEdit = (req as any).user?.userType === "Chef";
+
+    const topLevelUpdates = isSelfEdit ?
+    ["gender", "profilePic", "dob", "phoneNumber"] :
+    ["gender", "email", "profilePic", "dob", "phoneNumber"];
+    const chefDetailUpdates = isSelfEdit ?
+    ["bio", "specialties", "yearsOfExperience"] :
+    ["bio", "specialties", "rating", "staffId", "yearsOfExperience", "chefLevel"];
     const addressUpdates = ["stateId", "stateName", "city"];
 
     const updates: Record<string, any> = {};

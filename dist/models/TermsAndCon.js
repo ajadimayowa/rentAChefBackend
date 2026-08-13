@@ -37,6 +37,7 @@ exports.TermsAndConModel = void 0;
 const mongoose_1 = __importStar(require("mongoose"));
 const TermsAndConSchema = new mongoose_1.Schema({
     description: { type: String, required: true, trim: true },
+    termsUrl: { type: String, trim: true },
     serviceId: { type: mongoose_1.Schema.Types.ObjectId, ref: "Service" },
     categoryId: { type: mongoose_1.Schema.Types.ObjectId, ref: "ServiceCategory" },
     specialMenuId: { type: mongoose_1.Schema.Types.ObjectId, ref: "SpecialMenu" },

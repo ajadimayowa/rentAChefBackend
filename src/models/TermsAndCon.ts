@@ -2,6 +2,7 @@ import mongoose, { Document, Model, Schema, Types } from "mongoose";
 
 export interface ITermsAndCon extends Document {
   description: string;
+  termsUrl?: string;
   serviceId?: Types.ObjectId;
   categoryId?: Types.ObjectId;
   specialMenuId?: Types.ObjectId;
@@ -12,6 +13,7 @@ export interface ITermsAndCon extends Document {
 const TermsAndConSchema = new Schema<ITermsAndCon>(
   {
     description: { type: String, required: true, trim: true },
+    termsUrl: { type: String, trim: true },
     serviceId: { type: Schema.Types.ObjectId, ref: "Service" },
     categoryId: { type: Schema.Types.ObjectId, ref: "ServiceCategory" },
     specialMenuId: { type: Schema.Types.ObjectId, ref: "SpecialMenu" },

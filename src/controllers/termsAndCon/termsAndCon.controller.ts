@@ -15,8 +15,9 @@ const isValidObjectId = (value: unknown): value is string => {
 
 export const createTermsAndCon = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { description, serviceId, categoryId, specialMenuId } = req.body;
+    const { description, termsUrl, serviceId, categoryId, specialMenuId } = req.body;
     const normalizedDescription = typeof description === "string" ? description.trim() : "";
+    const normalizedTermsUrl = typeof termsUrl === "string" ? termsUrl.trim() : "";
 
     if (!normalizedDescription) {
       res.status(400).json({ success: false, message: "description is required" });
@@ -71,6 +72,7 @@ export const createTermsAndCon = async (req: Request, res: Response): Promise<vo
 
     const record = await TermsAndConModel.create({
       description: normalizedDescription,
+      termsUrl: normalizedTermsUrl || undefined,
       serviceId: serviceId || undefined,
       categoryId: categoryId || undefined,
       specialMenuId: specialMenuId || undefined,
@@ -157,7 +159,7 @@ export const getTermsAndConById = async (req: Request, res: Response): Promise<v
 export const updateTermsAndCon = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { description, serviceId, categoryId, specialMenuId } = req.body;
+    const { description, termsUrl, serviceId, categoryId, specialMenuId } = req.body;
 
     if (!Types.ObjectId.isValid(id)) {
       res.status(400).json({ success: false, message: "Invalid TermsAndCon id" });
@@ -177,6 +179,11 @@ export const updateTermsAndCon = async (req: Request, res: Response): Promise<vo
         return;
       }
       record.description = normalizedDescription;
+    }
+
+    if (termsUrl !== undefined) {
+      const normalizedTermsUrl = typeof termsUrl === "string" ? termsUrl.trim() : "";
+      record.termsUrl = normalizedTermsUrl || undefined;
     }
 
     if (serviceId !== undefined) {

@@ -14,7 +14,7 @@ import { getAllChefLevels } from "../controllers/chefLevel.controller";
 import { isAdmin } from "../middleware/isAdmin";
 import uploadAdImages from "../middleware/upload";
 import { requireAdminAuth } from "../middleware/auth/adminAuth.middleware";
-import { requireChefAuth } from "../middleware/auth/chefAuth.middleware";
+import { requireChefAuth, requireAdminOrChefOwnerAuth } from "../middleware/auth/chefAuth.middleware";
 
 // import { isAdmin } from "../middlewares/isAdmin";
 // import { protect } from "../middlewares/auth";
@@ -176,7 +176,7 @@ router.get("/chef/:id", getChefById);
  *             schema:
  *               $ref: '#/components/schemas/Chef'
  */
-router.put("/chef/:id",requireAdminAuth,uploadAdImages.single("chefPic"), updateChef);
+router.put("/chef/:id",requireAdminOrChefOwnerAuth,uploadAdImages.single("chefPic"), updateChef);
 
 // Admin only
 /**

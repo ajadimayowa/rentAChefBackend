@@ -32,6 +32,7 @@ const chefRating_routes_1 = __importDefault(require("./routes/chefRating.routes"
 const clientRating_routes_1 = __importDefault(require("./routes/clientRating.routes"));
 const termsAndCon_routes_1 = __importDefault(require("./routes/termsAndCon.routes"));
 const booking_routes_1 = __importDefault(require("./routes/booking.routes"));
+const residentialTestingSlot_routes_1 = __importDefault(require("./routes/residentialTestingSlot.routes"));
 const package_routes_1 = __importDefault(require("./routes/package.routes"));
 const menuTypes_routes_1 = __importDefault(require("./routes/menuTypes.routes"));
 const assignedBookingNumber_routes_1 = __importDefault(require("./routes/assignedBookingNumber.routes"));
@@ -82,6 +83,7 @@ app.use(apiPrefix, rating_routes_1.default);
 app.use(apiPrefix, clientRating_routes_1.default);
 app.use(apiPrefix, termsAndCon_routes_1.default);
 app.use(apiPrefix, booking_routes_1.default);
+app.use(apiPrefix, residentialTestingSlot_routes_1.default);
 app.use(apiPrefix, assignedBookingNumber_routes_1.default);
 // Server
 const PORT = process.env.PORT || 5000;

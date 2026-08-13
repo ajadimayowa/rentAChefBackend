@@ -25,3 +25,38 @@ export const requireChefAuth = async (req: Request, res: Response, next: NextFun
     return res.status(401).json({ success: false, message: 'Token failed' });
   }
 };
+
+// Allows either an admin, or the chef editing their own record (req.params.id) —
+// used by PUT /chef/:id so chefs can maintain their own profile without a
+// separate endpoint. The controller still limits which fields a self-editing
+// chef may touch.
+export const requireAdminOrChefOwnerAuth = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ success: false, message: 'No token provided' });
+
+  try {
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as any;
+
+    const user = await UserModel.findById(decoded.id);
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'Invalid token' });
+    }
+
+    if (!user.isActive) {
+      return res.status(403).json({ success: false, message: 'Account disabled' });
+    }
+
+    const isAdmin = user.userType === 'Admin';
+    const isOwnerChef = user.userType === 'Chef' && String(decoded.id) === req.params.id;
+
+    if (!isAdmin && !isOwnerChef) {
+      return res.status(403).json({ success: false, message: 'Not authorized to update this chef.' });
+    }
+
+    (req as any).user = user;
+    return next();
+  } catch (err) {
+    return res.status(401).json({ success: false, message: 'Invalid token' });
+  }
+};
