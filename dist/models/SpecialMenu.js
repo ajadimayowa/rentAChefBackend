@@ -14,11 +14,6 @@ const SpecialMenuSchema = new mongoose_1.Schema({
     description: { type: String },
     minimumGuests: { type: Number, required: true },
     numberOfDishes: { type: Number, required: true },
-    image: { type: String }, // image URL
-    procurements: {
-        type: [ProcurementSchema],
-        default: [],
-    },
     price: { type: Number, required: true },
 }, {
     timestamps: true,

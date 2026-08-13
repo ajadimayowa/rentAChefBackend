@@ -23,8 +23,9 @@ const isValidObjectId = (value) => {
 };
 const createTermsAndCon = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { description, serviceId, categoryId, specialMenuId } = req.body;
+        const { description, termsUrl, serviceId, categoryId, specialMenuId } = req.body;
         const normalizedDescription = typeof description === "string" ? description.trim() : "";
+        const normalizedTermsUrl = typeof termsUrl === "string" ? termsUrl.trim() : "";
         if (!normalizedDescription) {
             res.status(400).json({ success: false, message: "description is required" });
             return;
@@ -70,6 +71,7 @@ const createTermsAndCon = (req, res) => __awaiter(void 0, void 0, void 0, functi
         }
         const record = yield TermsAndCon_1.TermsAndConModel.create({
             description: normalizedDescription,
+            termsUrl: normalizedTermsUrl || undefined,
             serviceId: serviceId || undefined,
             categoryId: categoryId || undefined,
             specialMenuId: specialMenuId || undefined,
@@ -147,7 +149,7 @@ exports.getTermsAndConById = getTermsAndConById;
 const updateTermsAndCon = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
-        const { description, serviceId, categoryId, specialMenuId } = req.body;
+        const { description, termsUrl, serviceId, categoryId, specialMenuId } = req.body;
         if (!mongoose_1.Types.ObjectId.isValid(id)) {
             res.status(400).json({ success: false, message: "Invalid TermsAndCon id" });
             return;
@@ -164,6 +166,10 @@ const updateTermsAndCon = (req, res) => __awaiter(void 0, void 0, void 0, functi
                 return;
             }
             record.description = normalizedDescription;
+        }
+        if (termsUrl !== undefined) {
+            const normalizedTermsUrl = typeof termsUrl === "string" ? termsUrl.trim() : "";
+            record.termsUrl = normalizedTermsUrl || undefined;
         }
         if (serviceId !== undefined) {
             if (serviceId === null || serviceId === "") {

@@ -168,7 +168,7 @@ router.get("/chef/:id", chef_controller_1.getChefById);
  *             schema:
  *               $ref: '#/components/schemas/Chef'
  */
-router.put("/chef/:id", adminAuth_middleware_1.requireAdminAuth, upload_1.default.single("chefPic"), chef_controller_1.updateChef);
+router.put("/chef/:id", chefAuth_middleware_1.requireAdminOrChefOwnerAuth, upload_1.default.single("chefPic"), chef_controller_1.updateChef);
 // Admin only
 /**
  * @openapi

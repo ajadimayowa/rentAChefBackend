@@ -28,6 +28,7 @@ import chefRatingRoutes from './routes/chefRating.routes';
 import clientRatingRoutes from './routes/clientRating.routes';
 import termsAndConRoutes from './routes/termsAndCon.routes';
 import bookingRoutes from './routes/booking.routes';
+import residentialTestingSlotRoutes from './routes/residentialTestingSlot.routes';
 import packageRoutes from './routes/package.routes';
 import menuTypesRoutes from './routes/menuTypes.routes';
 import assignedBookingNumberRoutes from './routes/assignedBookingNumber.routes';
@@ -88,6 +89,7 @@ app.use(apiPrefix, ratingRoutes);
 app.use(apiPrefix, clientRatingRoutes);
 app.use(apiPrefix, termsAndConRoutes);
 app.use(apiPrefix, bookingRoutes);
+app.use(apiPrefix, residentialTestingSlotRoutes);
 app.use(apiPrefix, assignedBookingNumberRoutes);
 
 

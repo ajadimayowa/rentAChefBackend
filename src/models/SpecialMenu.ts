@@ -14,7 +14,6 @@ export interface ISpecialMenu extends Document {
   minimumGuests:number;
   numberOfDishes:number;
   image?: string;
-  procurements?:Types.ObjectId[];
   price: number;
   createdAt: Date;
   updatedAt: Date;
@@ -37,11 +36,6 @@ const SpecialMenuSchema = new Schema<ISpecialMenu>(
     description: { type: String },
     minimumGuests: { type: Number, required: true },
     numberOfDishes: { type: Number, required: true },
-    image: { type: String }, // image URL
-    procurements: {
-      type: [ProcurementSchema],
-      default: [],
-    },
     price: { type: Number, required: true },
   },
   {

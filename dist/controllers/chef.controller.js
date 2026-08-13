@@ -300,16 +300,13 @@ const getChefById = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
 exports.getChefById = getChefById;
 // ✅ Chef's own dashboard summary (auth required — reads the logged-in chef)
 const getChefDashboard = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c;
+    var _a, _b;
     try {
         const chefId = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
-        const [jobsCompleted, upcomingBookingsCount, earningsAgg, upcomingBookingsRaw] = yield Promise.all([
+        const [jobsCompleted, upcomingBookingsCount, menusCreated, upcomingBookingsRaw] = yield Promise.all([
             Booking_1.BookingModel.countDocuments({ chefId, status: "Completed" }),
             Booking_1.BookingModel.countDocuments({ chefId, status: { $nin: bookingStatus_1.CLOSED_BOOKING_STATUSES } }),
-            Booking_1.BookingModel.aggregate([
-                { $match: { chefId: new mongoose_1.default.Types.ObjectId(chefId), paymentStatus: "Paid" } },
-                { $group: { _id: null, total: { $sum: { $ifNull: ["$pricingSnapshot.estimatedTotalMinor", 0] } } } },
-            ]),
+            Menu_1.default.countDocuments({ chefId }),
             Booking_1.BookingModel.find({ chefId, status: { $nin: bookingStatus_1.CLOSED_BOOKING_STATUSES } })
                 .select("bookingNumber customerId serviceId status pricingSnapshot startDate bookingData createdAt")
                 .populate("customerId", "fullName")
@@ -325,7 +322,7 @@ const getChefDashboard = (req, res) => __awaiter(void 0, void 0, void 0, functio
                     upcomingBookings: upcomingBookingsCount,
                     jobsCompleted,
                     rating: ((_b = chef === null || chef === void 0 ? void 0 : chef.chefDetails) === null || _b === void 0 ? void 0 : _b.rating) || 0,
-                    lifetimeEarnings: (0, bookingStatus_1.minorToNaira)(((_c = earningsAgg === null || earningsAgg === void 0 ? void 0 : earningsAgg[0]) === null || _c === void 0 ? void 0 : _c.total) || 0),
+                    menusCreated,
                 },
                 upcomingBookings: upcomingBookingsRaw.map((booking) => {
                     var _a, _b, _c;
@@ -404,6 +401,7 @@ const getChefBookings = (req, res) => __awaiter(void 0, void 0, void 0, function
 exports.getChefBookings = getChefBookings;
 // ✅ Update Chef (Admin OR Chef owner)
 const updateChef = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
         const { id } = req.params;
         // ✅ Validate MongoDB ID
@@ -415,16 +413,17 @@ const updateChef = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
          * Prevent updating sensitive fields like password, isActive, staffId, etc.
          * (password intentionally excluded — password changes must go through the
          * dedicated OTP flow so they're hashed correctly)
+         *
+         * A chef editing their own record (as opposed to an admin) gets a narrower
+         * whitelist — email, rating, staffId and chefLevel stay admin-managed.
          */
-        const topLevelUpdates = ["gender", "email", "profilePic", "dob", "phoneNumber"];
-        const chefDetailUpdates = [
-            "bio",
-            "specialties",
-            "rating",
-            "staffId",
-            "yearsOfExperience",
-            "chefLevel",
-        ];
+        const isSelfEdit = ((_a = req.user) === null || _a === void 0 ? void 0 : _a.userType) === "Chef";
+        const topLevelUpdates = isSelfEdit ?
+            ["gender", "profilePic", "dob", "phoneNumber"] :
+            ["gender", "email", "profilePic", "dob", "phoneNumber"];
+        const chefDetailUpdates = isSelfEdit ?
+            ["bio", "specialties", "yearsOfExperience"] :
+            ["bio", "specialties", "rating", "staffId", "yearsOfExperience", "chefLevel"];
         const addressUpdates = ["stateId", "stateName", "city"];
         const updates = {};
         if (req.body.name !== undefined) {
