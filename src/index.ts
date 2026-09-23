@@ -62,7 +62,7 @@ app.use(express.urlencoded({ extended: true }));
 
 const apiPrefix = '/api/v1/';
 
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.use(`${apiPrefix}swagger`, swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Routes
 app.use(apiPrefix, authRoutes);
