@@ -47,6 +47,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.checkChefAvailability = exports.deleteChef = exports.disableChef = exports.updateChefStatus = exports.updateChef = exports.getChefBookings = exports.getChefDashboard = exports.getChefById = exports.getAllChefs = exports.createChef = void 0;
 const User_model_1 = __importDefault(require("../models/User.model"));
+const Category_1 = __importDefault(require("../models/Category"));
 const mongoose_1 = __importDefault(require("mongoose"));
 const chefsEmailNotification_1 = require("../services/email/rentAChef/chefsEmailNotification");
 const ChefService_1 = require("../models/ChefService");
@@ -199,7 +200,21 @@ const getAllChefs = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         const state = getQueryValue("state", "stateName");
         const isActiveQuery = getQueryValue("isActive", "active");
         const name = getQueryValue("name", "search", "q");
+        const category = getQueryValue("category", "categoryId", "categoryName", "chefCategoryId");
         const filter = { userType: "Chef" };
+        // 🔍 Filter by chef category / level — accepts either the Category _id or its name
+        if (category) {
+            if (mongoose_1.default.Types.ObjectId.isValid(category)) {
+                filter["chefDetails.chefLevel"] = category;
+            }
+            else {
+                const matchingCategory = yield Category_1.default.findOne({
+                    name: { $regex: `^${escapeRegex(category)}$`, $options: "i" },
+                }).select("_id");
+                // No match → force an empty result set rather than falling through to "all chefs"
+                filter["chefDetails.chefLevel"] = matchingCategory ? matchingCategory._id : null;
+            }
+        }
         if (city) {
             filter["address.city"] = { $regex: escapeRegex(city), $options: "i" };
         }

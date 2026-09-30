@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import User from "../models/User.model";
+import Category from "../models/Category";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import { sendChefApprovedEmail, sendChefCreationSuccessEmail } from "../services/email/rentAChef/chefsEmailNotification";
@@ -195,8 +196,23 @@ export const getAllChefs = async (req: Request, res: Response): Promise<any> => 
     const state = getQueryValue("state", "stateName");
     const isActiveQuery = getQueryValue("isActive", "active");
     const name = getQueryValue("name", "search", "q");
+    const category = getQueryValue("category", "categoryId", "categoryName", "chefCategoryId");
 
     const filter: any = { userType: "Chef" };
+
+    // 🔍 Filter by chef category / level — accepts either the Category _id or its name
+    if (category) {
+      if (mongoose.Types.ObjectId.isValid(category)) {
+        filter["chefDetails.chefLevel"] = category;
+      } else {
+        const matchingCategory = await Category.findOne({
+          name: { $regex: `^${escapeRegex(category)}$`, $options: "i" },
+        }).select("_id");
+
+        // No match → force an empty result set rather than falling through to "all chefs"
+        filter["chefDetails.chefLevel"] = matchingCategory ? matchingCategory._id : null;
+      }
+    }
 
     if (city) {
       filter["address.city"] = { $regex: escapeRegex(city), $options: "i" };
