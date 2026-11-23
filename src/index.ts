@@ -1,4 +1,6 @@
 import express from 'express';
+import multer from 'multer';
+import { MAX_UPLOAD_LABEL } from './middleware/upload';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import connectDB from './config/db';
@@ -99,6 +101,24 @@ app.use(apiPrefix, assignedBookingNumberRoutes);
 
 
 
+
+// Upload errors (file over the 2 MB cap, wrong type) → a clear 400 instead of Express's HTML 500.
+const uploadErrorHandler: express.ErrorRequestHandler = (err, _req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    const message =
+      err.code === "LIMIT_FILE_SIZE"
+        ? `File is too large. The maximum upload size is ${MAX_UPLOAD_LABEL}.`
+        : err.message;
+    res.status(400).json({ success: false, message });
+    return;
+  }
+  if (typeof err?.message === "string" && /only .*(allowed)/i.test(err.message)) {
+    res.status(400).json({ success: false, message: err.message });
+    return;
+  }
+  next(err);
+};
+app.use(uploadErrorHandler);
 
 // Server
 const PORT = process.env.PORT || 5000;

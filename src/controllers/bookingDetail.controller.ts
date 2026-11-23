@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import mongoose from "mongoose";
 import { BookingModel } from "../models/Booking";
+import Procurement from "../models/Procurement";
 import { bestEffortBookingDate, bestEffortGuestCount, minorToNaira } from "../utils/bookingStatus";
 
 /**
@@ -43,6 +44,8 @@ export const getBookingDetail = async (req: Request, res: Response): Promise<any
     // Bookings assigned before chef confirmation existed still await the chef's answer.
     if (chefId && !rest.chefResponse?.status) rest.chefResponse = { status: "pending" };
     const pricing = rest.pricingSnapshot || {};
+    // Procurement records (PDF + amount) the admin raised for this booking, newest first.
+    const procurements = await Procurement.find({ bookingId: booking._id }).sort({ createdAt: -1 });
 
     return res.status(200).json({
       success: true,
@@ -51,6 +54,7 @@ export const getBookingDetail = async (req: Request, res: Response): Promise<any
         customer: customerId || null,
         chef: chefId || null,
         service: serviceId || null,
+        procurements: procurements.map((p) => p.toJSON()),
         date: bestEffortBookingDate(booking),
         guests: bestEffortGuestCount(booking.bookingData),
         pricingSnapshot: {

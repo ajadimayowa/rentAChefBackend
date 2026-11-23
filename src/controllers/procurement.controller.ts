@@ -3,57 +3,77 @@ import Procurement from '../models/Procurement';
 import axios from 'axios';
 import { Types } from 'mongoose';
 import { BookingModel } from '../models/Booking';
-import Notification from '../models/Notification';
+import { notifyUser } from '../services/userNotifications';
+import { notifyAdmins } from '../services/adminNotifications';
 import User from '../models/User.model';
 import { sendBookingNotificationEmail } from '../services/email/rentAChef/bookingEmailNotifications';
 
 const firstNameOf = (fullName?: string) => (fullName || 'there').trim().split(' ')[0];
 
+const formatNaira = (amount: number) =>
+  `₦${amount.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+
+/**
+ * POST /procurement/create (admin, multipart/form-data)
+ *   bookingId   — the booking the procurement belongs to
+ *   totalAmount — what the client must pay, in Naira
+ *   procurementPdf — the procurement document (PDF, uploaded to S3 by multer)
+ * The client is notified (in-app + email) so they can view the PDF and pay.
+ */
 export const createProcurement = async (req: Request, res: Response): Promise<any> => {
   try {
-    const { bookingId, items, isProcurementPaid, paymentChannel, paymentReference } = req.body;
+    const file = (req as any).file as { location?: string; originalname?: string } | undefined;
+    const { bookingId } = req.body;
+    const rawAmount = String(req.body.totalAmount ?? '').trim();
+    const totalAmount = Number(rawAmount);
 
-    if (!bookingId || !Array.isArray(items)) {
-      return res.status(400).json({ success: false, message: 'bookingId and items are required' });
+    if (!bookingId || !Types.ObjectId.isValid(bookingId)) {
+      return res.status(400).json({ success: false, message: 'A valid bookingId is required' });
+    }
+    if (!file?.location) {
+      return res.status(400).json({ success: false, message: 'Upload the procurement PDF' });
+    }
+    if (!/^\d+(\.\d{1,2})?$/.test(rawAmount) || !(totalAmount > 0)) {
+      return res.status(400).json({ success: false, message: 'Enter a valid total amount' });
     }
 
-    // ensure booking exists
     const booking = await BookingModel.findById(bookingId);
     if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
 
-    const createPayload: any = { bookingId, items };
-    if (typeof isProcurementPaid === 'boolean') createPayload.isProcurementPaid = isProcurementPaid;
-    if (paymentChannel) createPayload.paymentChannel = paymentChannel;
-    if (paymentReference) createPayload.paymentReference = paymentReference;
+    const procurement = await Procurement.create({
+      bookingId,
+      items: [],
+      totalCost: totalAmount,
+      documentUrl: file.location,
+      documentName: file.originalname,
+      createdBy: (req as any).user?._id,
+    });
 
-    const procurement = await Procurement.create(createPayload);
-
-    // attach procurement to booking
-    booking.procurement = procurement._id as any;
-    await booking.save();
-
-    // Notify customer that procurement has been added to their booking
-    try {
-      await Notification.create({
-        userId: booking.customerId,
-        type: 'procurement-update',
-        title: 'Procurement added to booking',
-        message: `Additional procurement items were added to your booking. Total: ${procurement.totalCost}`,
-      });
-    } catch (err) {
-      console.error('Failed to create notification for procurement creation', err);
-    }
-
+    // The procurement is saved — notification/email problems must not fail the request.
     if (booking.customerId) {
-      const customer = await User.findById(booking.customerId).select('fullName email');
-      if (customer?.email) {
-        await sendBookingNotificationEmail({
-          firstName: firstNameOf(customer.fullName),
-          email: customer.email,
-          heading: 'Procurement added to your booking',
-          message: `Additional procurement items were added to your booking. Total cost: ${procurement.totalCost}.`,
-          bookingNumber: booking.bookingNumber,
-        });
+      void notifyUser({
+        userId: booking.customerId as any,
+        type: 'procurement-update',
+        title: 'Procurement added to your booking',
+        message: `A procurement of ${formatNaira(totalAmount)} was added to booking ${booking.bookingNumber}. View the document and make payment.`,
+        link: `/client/bookings/${booking._id}`,
+        resourceId: String(booking._id),
+        metadata: { bookingId: String(booking._id), procurementId: String(procurement._id) },
+      });
+
+      try {
+        const customer = await User.findById(booking.customerId).select('fullName email');
+        if (customer?.email) {
+          await sendBookingNotificationEmail({
+            firstName: firstNameOf(customer.fullName),
+            email: customer.email,
+            heading: 'Procurement added to your booking',
+            message: `A procurement of ${formatNaira(totalAmount)} has been added to your booking. Log in to view the procurement document and make payment.`,
+            bookingNumber: booking.bookingNumber,
+          });
+        }
+      } catch (err) {
+        console.error('createProcurement: customer email failed', err);
       }
     }
 
@@ -89,9 +109,17 @@ export const userPayProcurement = async (req: Request, res: Response): Promise<a
       return res.status(403).json({ success: false, message: 'Transfer marking must be performed by admin' });
     }
 
+    if (procurement.isProcurementPaid) {
+      return res.status(409).json({ success: false, message: 'This procurement has already been paid' });
+    }
+
     if (paymentChannel === 'paystack') {
       const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
       if (!PAYSTACK_SECRET_KEY) return res.status(500).json({ success: false, message: 'Paystack not configured' });
+
+      // A Paystack reference can only settle one procurement.
+      const reused = await Procurement.exists({ _id: { $ne: procurement._id }, paymentReference });
+      if (reused) return res.status(409).json({ success: false, message: 'This payment reference has already been used' });
 
       try {
         const verifyUrl = `https://api.paystack.co/transaction/verify/${paymentReference}`;
@@ -101,9 +129,9 @@ export const userPayProcurement = async (req: Request, res: Response): Promise<a
 
         const paidAmount = Number(data.amount) / 100;
         if (typeof procurement.totalCost === 'number' && paidAmount < procurement.totalCost) {
+          // Record the attempt but leave it unpaid — an underpayment must not settle it.
           procurement.paymentChannel = paymentChannel;
           procurement.paymentReference = paymentReference;
-          procurement.isProcurementPaid = true;
           await procurement.save();
           return res.status(400).json({ success: false, message: 'Payment amount less than procurement total' });
         }
@@ -113,19 +141,22 @@ export const userPayProcurement = async (req: Request, res: Response): Promise<a
         procurement.paymentReference = paymentReference;
         await procurement.save();
 
-        // notify chef that procurement has been paid
-        try {
-          if (booking.chefId) {
-            await Notification.create({
-              userId: booking.chefId,
-              type: 'payment-receipt',
-              title: 'Procurement paid',
-              message: `Procurement for booking ${booking._id} has been paid by the customer.`,
-            });
-          }
-        } catch (err) {
-          console.error('Failed to send notification on procurement paid', err);
+        if (booking.chefId) {
+          void notifyUser({
+            userId: booking.chefId as any,
+            type: 'payment-receipt',
+            title: 'Procurement paid',
+            message: `The client paid the procurement for booking ${booking.bookingNumber}.`,
+            link: `/chef/bookings/${booking._id}`,
+            metadata: { bookingId: String(booking._id), procurementId: String(procurement._id) },
+          });
         }
+        void notifyAdmins({
+          type: 'payment-confirmed',
+          title: 'Procurement paid',
+          message: `${formatNaira(procurement.totalCost)} procurement paid for booking ${booking.bookingNumber}.`,
+          link: `/admin/bookings/${booking._id}`,
+        });
 
         return res.json({ success: true, message: 'Procurement marked as paid', payload: procurement });
       } catch (err: any) {
@@ -259,25 +290,123 @@ export const markProcurementPaid = async (req: Request, res: Response): Promise<
   }
 };
 
+/** DELETE /procurement/:id (admin) — only while the procurement is still unpaid. */
 export const deleteProcurement = async (req: Request, res: Response): Promise<any> => {
   try {
-    const procurement = await Procurement.findByIdAndDelete(req.params.id);
+    if (!Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: 'Invalid procurement id' });
+    }
+    const procurement = await Procurement.findById(req.params.id);
     if (!procurement) return res.status(404).json({ success: false, message: 'Procurement not found' });
+    if (procurement.isProcurementPaid) {
+      return res.status(409).json({ success: false, message: 'A paid procurement cannot be deleted' });
+    }
 
-    // unlink from booking if attached
-    try {
-      const booking = await BookingModel.findById(procurement.bookingId);
-      if (booking && String(booking.procurement) === String(procurement._id)) {
-        booking.procurement = undefined as any;
-        await booking.save();
-      }
-    } catch (err) {
-      // ignore
+    // Conditional delete so a payment landing at the same moment can't be lost.
+    const deleted = await Procurement.findOneAndDelete({ _id: procurement._id, isProcurementPaid: { $ne: true } });
+    if (!deleted) {
+      return res.status(409).json({ success: false, message: 'A paid procurement cannot be deleted' });
     }
 
     return res.json({ success: true, message: 'Procurement deleted' });
   } catch (error: any) {
     console.error('deleteProcurement error', error);
     return res.status(500).json({ success: false, message: 'Failed to delete procurement', error: error.message });
+  }
+};
+
+/**
+ * POST /procurements/pay (booking customer)
+ *   { bookingId, procurementIds, paymentReference }
+ * One Paystack payment settles every listed unpaid procurement on the booking —
+ * the client pays the outstanding procurement total in one go. The ids are the
+ * ones the client saw when starting checkout, so a procurement the admin adds
+ * meanwhile isn't silently included or left short.
+ */
+export const payOutstandingProcurements = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const user = (req as any).user;
+    const { bookingId, procurementIds, paymentReference } = req.body ?? {};
+
+    if (!bookingId || !Types.ObjectId.isValid(bookingId)) {
+      return res.status(400).json({ success: false, message: 'A valid bookingId is required' });
+    }
+    if (!Array.isArray(procurementIds) || procurementIds.length === 0 || !procurementIds.every((id) => Types.ObjectId.isValid(id))) {
+      return res.status(400).json({ success: false, message: 'procurementIds are required' });
+    }
+    if (!paymentReference || typeof paymentReference !== 'string') {
+      return res.status(400).json({ success: false, message: 'paymentReference is required' });
+    }
+
+    const booking = await BookingModel.findById(bookingId);
+    if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
+    if (String(booking.customerId) !== String(user._id)) {
+      return res.status(403).json({ success: false, message: 'Not allowed to pay for this booking' });
+    }
+
+    const ids = [...new Set(procurementIds.map(String))];
+    const procurements = await Procurement.find({ _id: { $in: ids }, bookingId: booking._id });
+    if (procurements.length !== ids.length) {
+      return res.status(404).json({ success: false, message: 'Some of these procurements no longer exist' });
+    }
+    const unpaid = procurements.filter((p) => !p.isProcurementPaid);
+    if (unpaid.length === 0) {
+      return res.status(409).json({ success: false, message: 'These procurements have already been paid' });
+    }
+
+    const reused = await Procurement.exists({ _id: { $nin: ids }, paymentReference });
+    if (reused) return res.status(409).json({ success: false, message: 'This payment reference has already been used' });
+
+    const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
+    if (!PAYSTACK_SECRET_KEY) return res.status(500).json({ success: false, message: 'Paystack not configured' });
+
+    let paidAmount = 0;
+    try {
+      const response = await axios.get(`https://api.paystack.co/transaction/verify/${encodeURIComponent(paymentReference)}`, {
+        headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` },
+      });
+      const data = response.data?.data;
+      if (!data || data.status !== 'success') {
+        return res.status(400).json({ success: false, message: 'Paystack verification failed' });
+      }
+      paidAmount = Number(data.amount) / 100;
+    } catch (err: any) {
+      console.error('Paystack verification error', err?.response?.data || err.message || err);
+      return res.status(500).json({ success: false, message: 'Error verifying Paystack payment' });
+    }
+
+    const outstanding = unpaid.reduce((sum, p) => sum + (Number(p.totalCost) || 0), 0);
+    // Small tolerance for kobo rounding.
+    if (paidAmount + 0.005 < outstanding) {
+      return res.status(400).json({ success: false, message: 'Payment amount is less than the outstanding procurement total' });
+    }
+
+    await Procurement.updateMany(
+      { _id: { $in: unpaid.map((p) => p._id) }, isProcurementPaid: { $ne: true } },
+      { $set: { isProcurementPaid: true, paymentChannel: 'paystack', paymentReference } }
+    );
+    const updated = await Procurement.find({ bookingId: booking._id }).sort({ createdAt: -1 });
+
+    if (booking.chefId) {
+      void notifyUser({
+        userId: booking.chefId as any,
+        type: 'payment-receipt',
+        title: 'Procurement paid',
+        message: `The client paid ${formatNaira(outstanding)} procurement for booking ${booking.bookingNumber}.`,
+        link: `/chef/bookings/${booking._id}`,
+        metadata: { bookingId: String(booking._id) },
+      });
+    }
+    void notifyAdmins({
+      type: 'payment-confirmed',
+      title: 'Procurement paid',
+      message: `${formatNaira(outstanding)} procurement paid for booking ${booking.bookingNumber}.`,
+      link: `/admin/bookings/${booking._id}`,
+    });
+
+    return res.json({ success: true, message: 'Procurement paid', payload: updated });
+  } catch (error: any) {
+    console.error('payOutstandingProcurements error', error);
+    return res.status(500).json({ success: false, message: 'Failed to process procurement payment', error: error.message });
   }
 };

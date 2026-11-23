@@ -20,6 +20,12 @@ import {
   markAdminNotificationRead,
   markAllAdminNotificationsRead,
 } from "../controllers/adminNotification.controller";
+import {
+  listMyNotifications,
+  markAllMyNotificationsRead,
+  markMyNotificationRead,
+  myNotificationUnreadCount,
+} from "../controllers/myNotification.controller";
 
 const router = Router();
 
@@ -44,5 +50,11 @@ router.get("/messages/conversation", participantAuth, getMyConversation);
 router.get("/messages", participantAuth, getMyMessages);
 router.post("/messages", participantAuth, sendMyMessage);
 router.post("/messages/read", participantAuth, markMyMessagesRead);
+
+/* Chef / customer notification bell — always the caller's own notifications */
+router.get("/me/notifications", participantAuth, listMyNotifications);
+router.get("/me/notifications/unread-count", participantAuth, myNotificationUnreadCount);
+router.post("/me/notifications/read-all", participantAuth, markAllMyNotificationsRead);
+router.post("/me/notifications/:id/read", participantAuth, markMyNotificationRead);
 
 export default router;

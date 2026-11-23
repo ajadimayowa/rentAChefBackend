@@ -5,6 +5,7 @@ import User from "../models/User.model";
 import { BookingStatus, PaymentStatus } from "../platform/domain/enums";
 import { bestEffortBookingDate, bestEffortGuestCount, minorToNaira } from "../utils/bookingStatus";
 import { sendBookingNotificationEmail } from "../services/email/rentAChef/bookingEmailNotifications";
+import { notifyUser } from "../services/userNotifications";
 
 const firstNameOf = (fullName?: string) => (fullName || "there").trim().split(" ")[0];
 
@@ -109,6 +110,17 @@ export const updateAdminBookingStatus = async (req: Request, res: Response): Pro
     booking.timeline.push({ status, changedBy: actorId, changedAt: new Date() });
     await booking.save();
 
+    if (booking.chefId) {
+      void notifyUser({
+        userId: booking.chefId as any,
+        type: "booking-status-update",
+        title: `Booking ${booking.bookingNumber} updated`,
+        message: `The booking status is now "${status}".`,
+        link: `/chef/bookings/${booking._id}`,
+        metadata: { bookingId: String(booking._id), status },
+      });
+    }
+
     // "Admin Reviewed" is the closest thing this system has to an explicit "approved" status.
     if (status === BookingStatus.ADMIN_REVIEW && booking.customerId) {
       const customer = await User.findById(booking.customerId).select("fullName email");
@@ -186,6 +198,15 @@ export const assignAdminBookingChef = async (req: Request, res: Response): Promi
         : `Chef ${chef.fullName} assigned by admin — awaiting the chef's confirmation`,
     });
     await booking.save();
+
+    void notifyUser({
+      userId: chef._id as any,
+      type: "booking-assignment",
+      title: "New booking assigned to you",
+      message: `Booking ${booking.bookingNumber} is waiting for you to accept or decline it.`,
+      link: `/chef/bookings/${booking._id}`,
+      metadata: { bookingId: String(booking._id) },
+    });
 
     // The assignment is saved at this point — an email problem must not turn it into
     // an "Error assigning chef" response.
