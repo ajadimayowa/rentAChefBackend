@@ -15,6 +15,24 @@ const buildCategoryQuery = (idOrSlug: string) => {
   return { slug: String(idOrSlug).toLowerCase().trim() };
 };
 
+/**
+ * Create/update accept JSON or multipart (when a picture is attached), and multipart
+ * sends every field as a string — so "true"/"false" must be accepted for isActive.
+ * Returns undefined when absent, null when present but invalid.
+ */
+const parseIsActive = (value: unknown): boolean | undefined | null => {
+  if (value === undefined) return undefined;
+  if (typeof value === "boolean") return value;
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return null;
+};
+
+const uploadedImageUrl = (req: Request): string | undefined => {
+  const file = req.file as any;
+  return file ? file.location || file.path : undefined;
+};
+
 /* ===================== SERVICE CATEGORY CRUD ===================== */
 
 export const createServiceCategory = async (req: Request, res: Response): Promise<void> => {
@@ -40,7 +58,8 @@ export const createServiceCategory = async (req: Request, res: Response): Promis
     const category = await ServiceCategoryModel.create({
       name: normalizedName,
       description: normalizedDescription,
-      isActive: typeof isActive === "boolean" ? isActive : true,
+      image: uploadedImageUrl(req) ?? "",
+      isActive: parseIsActive(isActive) ?? true,
     });
 
     res.status(201).json({ success: true, payload: category });
@@ -139,13 +158,18 @@ export const updateServiceCategory = async (req: Request, res: Response): Promis
       category.description = typeof description === "string" ? description.trim() : "";
     }
 
-    if (isActive !== undefined) {
-      if (typeof isActive !== "boolean") {
-        res.status(400).json({ success: false, message: "isActive must be a boolean" });
-        return;
-      }
+    const parsedIsActive = parseIsActive(isActive);
+    if (parsedIsActive === null) {
+      res.status(400).json({ success: false, message: "isActive must be a boolean" });
+      return;
+    }
+    if (parsedIsActive !== undefined) {
+      category.isActive = parsedIsActive;
+    }
 
-      category.isActive = isActive;
+    const imageUrl = uploadedImageUrl(req);
+    if (imageUrl) {
+      category.image = imageUrl;
     }
 
     await category.save();

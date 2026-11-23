@@ -6,6 +6,11 @@ import {
   updateServiceCategory,
   deleteServiceCategory,
 } from "../controllers/services/serviceCategory.controller";
+import { requireAdminAuth } from "../middleware/auth/adminAuth.middleware";
+import { createUpload } from "../middleware/upload";
+
+// Category pictures arrive as the multipart `image` field.
+const uploadCategoryImage = createUpload("images/service-categories").single("image");
 
 const router = Router();
 
@@ -30,7 +35,7 @@ const router = Router();
  *             schema:
  *               $ref: '#/components/schemas/ServiceCategoryResponse'
  */
-router.post("/service-category/create", createServiceCategory);
+router.post("/service-category/create", requireAdminAuth, uploadCategoryImage, createServiceCategory);
 /**
  * @openapi
  * /service-category/categories:
@@ -96,7 +101,7 @@ router.get("/service-category/:id", getServiceCategoryById);
  *             schema:
  *               $ref: '#/components/schemas/ServiceCategoryResponse'
  */
-router.put("/service-category/:id", updateServiceCategory);
+router.put("/service-category/:id", requireAdminAuth, uploadCategoryImage, updateServiceCategory);
 /**
  * @openapi
  * /service-category/{id}:
@@ -118,6 +123,6 @@ router.put("/service-category/:id", updateServiceCategory);
  *             schema:
  *               $ref: '#/components/schemas/ServiceCategoryDeleteResponse'
  */
-router.delete("/service-category/:id", deleteServiceCategory);
+router.delete("/service-category/:id", requireAdminAuth, deleteServiceCategory);
 
 export default router;

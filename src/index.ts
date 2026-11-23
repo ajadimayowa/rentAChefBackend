@@ -32,6 +32,7 @@ import residentialTestingSlotRoutes from './routes/residentialTestingSlot.routes
 import packageRoutes from './routes/package.routes';
 import menuTypesRoutes from './routes/menuTypes.routes';
 import assignedBookingNumberRoutes from './routes/assignedBookingNumber.routes';
+import messagingRoutes from './routes/messaging.routes';
 import { verifyEmailTransport } from './services/email/emailService';
 
 
@@ -66,6 +67,9 @@ app.use(`${apiPrefix}swagger`, swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Routes
 app.use(apiPrefix, authRoutes);
+// Must come before adminRoutes: its catch-all GET/PUT/DELETE /admin/:id would
+// otherwise swallow /admin/conversations and /admin/notifications (treating them as admin ids).
+app.use(apiPrefix, messagingRoutes);
 app.use(apiPrefix, adminRoutes);
 app.use(apiPrefix, chefRoutes);
 app.use(apiPrefix, categoryRoutes);

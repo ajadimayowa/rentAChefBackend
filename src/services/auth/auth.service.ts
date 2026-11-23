@@ -1,3 +1,5 @@
+import { formatPersonName } from "../../utils/formatName";
+import { formatNigerianPhoneNumber } from "../../utils/otpUtils";
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import UserModel, { IUser, UserType } from '../../models/User.model';
@@ -40,14 +42,24 @@ export const registerCustomer = async (params: {
     throw new AuthError(400, 'A user with this email already exist.');
   }
 
-  const firstName = fullName.split(' ')[0];
+  const formattedName = formatPersonName(fullName);
+  const firstName = formattedName.split(' ')[0];
+
+  // Phone numbers are always stored as +234XXXXXXXXXX.
+  let formattedPhone: string;
+  try {
+    formattedPhone = formatNigerianPhoneNumber(String(phoneNumber));
+  } catch {
+    throw new AuthError(400, 'Enter a valid Nigerian phone number.');
+  }
+
   const emailVerificationOtp = generateEmailVerificationOtp();
 
   const user = await UserModel.create({
     email: formattedEmail,
-    phoneNumber,
+    phoneNumber: formattedPhone,
     password, // plaintext — pre-save hook hashes it
-    fullName,
+    fullName: formattedName,
     firstName,
     userType: 'Customer',
     isActive: true,

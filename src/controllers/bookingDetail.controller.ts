@@ -37,7 +37,11 @@ export const getBookingDetail = async (req: Request, res: Response): Promise<any
     }
 
     const json = booking.toJSON() as any;
-    const { customerId, chefId, serviceId, ...rest } = json;
+    const { customerId, chefId, serviceId, declinedChefs, ...rest } = json;
+    // Who declined (and why) is for admins only; chefs and customers just see the current state.
+    if (isAdmin) rest.declinedChefs = declinedChefs || [];
+    // Bookings assigned before chef confirmation existed still await the chef's answer.
+    if (chefId && !rest.chefResponse?.status) rest.chefResponse = { status: "pending" };
     const pricing = rest.pricingSnapshot || {};
 
     return res.status(200).json({

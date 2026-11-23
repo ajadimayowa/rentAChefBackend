@@ -2,10 +2,10 @@ import { Request, Response } from "express";
 import { ServiceModel } from "../../models/Service";
 import { Types } from "mongoose";
 import { ServiceCategoryModel } from "../../models/ServiceCategoryModel";
+import Category from "../../models/Category";
 
 /* ===================== SERVICE CRUD ===================== */
 
-const ALLOWED_CHEF_LEVELS = ["sous","executive","junior","senior","pro","head"] as const;
 const ALLOWED_BOOKING_TYPES = ["instant", "quotation"] as const;
 
 const isDuplicateKeyError = (error: unknown): boolean => {
@@ -13,34 +13,87 @@ const isDuplicateKeyError = (error: unknown): boolean => {
   return typedError?.code === 11000;
 };
 
-const normalizeChefLevels = (
+/*
+ * Create/update accept JSON or multipart (when a picture is attached). Multipart sends
+ * every field as a string, so booleans may arrive as "true"/"false" and
+ * allowedChefLevels as a JSON-encoded array (an empty array can't be expressed as
+ * repeated form fields).
+ */
+
+/** undefined when absent, null when present but not a boolean. */
+const parseBoolean = (value: unknown): boolean | undefined | null => {
+  if (value === undefined) return undefined;
+  if (typeof value === "boolean") return value;
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return null;
+};
+
+/**
+ * allowedChefLevels holds chef-level (Category) ids. Returns [] when absent,
+ * null when malformed, or names the first id that isn't an existing chef level.
+ */
+const normalizeChefLevels = async (
   allowedChefLevels: unknown
-): Array<(typeof ALLOWED_CHEF_LEVELS)[number]> | null => {
+): Promise<Types.ObjectId[] | null | { unknownId: string }> => {
   if (allowedChefLevels === undefined) return [];
 
-  if (!Array.isArray(allowedChefLevels)) {
-    return null;
+  let list: unknown = allowedChefLevels;
+  if (typeof list === "string") {
+    try {
+      list = JSON.parse(list);
+    } catch {
+      return null;
+    }
   }
+  if (!Array.isArray(list)) return null;
 
-  const normalized = allowedChefLevels
-    .filter((level): level is string => typeof level === "string")
-    .map((level) => level.trim().toLowerCase())
-    .filter((level) => ALLOWED_CHEF_LEVELS.includes(level as (typeof ALLOWED_CHEF_LEVELS)[number]));
+  const ids = [...new Set(list.map((v) => (typeof v === "string" ? v.trim() : "")))];
+  if (ids.some((id) => !Types.ObjectId.isValid(id))) return null;
+  if (!ids.length) return [];
 
-  return [...new Set(normalized)] as Array<(typeof ALLOWED_CHEF_LEVELS)[number]>;
+  const found = await Category.find({ _id: { $in: ids } }).select("_id").lean();
+  const foundIds = new Set(found.map((c: any) => String(c._id)));
+  const missing = ids.find((id) => !foundIds.has(id));
+  if (missing) return { unknownId: missing };
+
+  return ids.map((id) => new Types.ObjectId(id));
 };
+
+const chefLevelError = (result: null | { unknownId: string }): string =>
+  result === null
+    ? "allowedChefLevels must be an array of chef level ids"
+    : `Chef level ${result.unknownId} does not exist`;
+
+const uploadedImageUrl = (req: Request): string | undefined => {
+  const file = req.file as any;
+  return file ? file.location || file.path : undefined;
+};
+
+const CAPABILITY_FIELDS = ["supportsChefMenu", "supportsCustomerMenuUpload", "supportsProcurement"] as const;
 
 // CREATE SERVICE
 export const createService = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { name, icon, categoryId, description, workflow, allowedChefLevels, bookingType, isActive } = req.body;
+    const {
+      name,
+      icon,
+      categoryId,
+      description,
+      workflow,
+      allowedChefLevels,
+      bookingType,
+      isActive,
+    } = req.body;
     const normalizedName = typeof name === "string" ? name.trim() : "";
     const normalizedDescription = typeof description === "string" ? description.trim() : "";
     const normalizedIcon = typeof icon === "string" ? icon.trim() : "";
     const normalizedWorkflow = typeof workflow === "string" ? workflow.trim() : "";
     const normalizedBookingType =
       typeof bookingType === "string" ? bookingType.trim().toLowerCase() : "";
-    const normalizedChefLevels = normalizeChefLevels(allowedChefLevels);
+    const normalizedChefLevels = await normalizeChefLevels(allowedChefLevels);
+    const parsedIsActive = parseBoolean(isActive);
+    const imageUrl = uploadedImageUrl(req);
 
     if (!normalizedName) {
       res.status(400).json({ success: false, message: "Service name is required" });
@@ -64,10 +117,13 @@ export const createService = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    if (normalizedChefLevels === null) {
-      res
-        .status(400)
-        .json({ success: false, message: "allowedChefLevels must be an array of valid chef levels" });
+    if (!Array.isArray(normalizedChefLevels)) {
+      res.status(400).json({ success: false, message: chefLevelError(normalizedChefLevels) });
+      return;
+    }
+
+    if (!imageUrl) {
+      res.status(400).json({ success: false, message: "A service image is required" });
       return;
     }
 
@@ -90,12 +146,19 @@ export const createService = async (req: Request, res: Response): Promise<void> 
     const service = await ServiceModel.create({
       categoryId,
       icon: typeof normalizedIcon === "string" ? normalizedIcon : "",
+      image: imageUrl,
       name: normalizedName,
       description: normalizedDescription,
       workflow: normalizedWorkflow,
       allowedChefLevels: normalizedChefLevels,
       bookingType: normalizedBookingType,
-      isActive: typeof isActive === "boolean" ? isActive : true,
+      isActive: parsedIsActive ?? true,
+      // Only pass real booleans through; anything else falls back to the schema defaults.
+      ...Object.fromEntries(
+        CAPABILITY_FIELDS.map((field) => [field, parseBoolean(req.body[field])]).filter(
+          ([, value]) => typeof value === "boolean"
+        )
+      ),
     });
 
     res.status(201).json({ success: true, payload: service });
@@ -252,16 +315,30 @@ export const updateService = async (req: Request, res: Response): Promise<void> 
     }
 
     if (allowedChefLevels !== undefined) {
-      const normalizedChefLevels = normalizeChefLevels(allowedChefLevels);
-      if (normalizedChefLevels === null) {
-        res
-          .status(400)
-          .json({ success: false, message: "allowedChefLevels must be an array of valid chef levels" });
+      const normalizedChefLevels = await normalizeChefLevels(allowedChefLevels);
+      if (!Array.isArray(normalizedChefLevels)) {
+        res.status(400).json({ success: false, message: chefLevelError(normalizedChefLevels) });
         return;
       }
 
       service.allowedChefLevels = normalizedChefLevels;
+    } else if (!Array.isArray(service.allowedChefLevels)) {
+      // Services saved before chef levels became records hold names like "senior",
+      // which can't be cast to ids and would make save() fail — clear them.
+      service.allowedChefLevels = [];
     }
+
+    for (const field of CAPABILITY_FIELDS) {
+      const value = parseBoolean(req.body[field]);
+      if (value === null) {
+        res.status(400).json({ success: false, message: `${field} must be a boolean` });
+        return;
+      }
+      if (value !== undefined) service[field] = value;
+    }
+
+    const imageUrl = uploadedImageUrl(req);
+    if (imageUrl) service.image = imageUrl;
 
     if (bookingType !== undefined) {
       const normalizedBookingType =
@@ -277,14 +354,12 @@ export const updateService = async (req: Request, res: Response): Promise<void> 
       service.bookingType = normalizedBookingType as "instant" | "quotation";
     }
 
-    if (isActive !== undefined) {
-      if (typeof isActive !== "boolean") {
-        res.status(400).json({ success: false, message: "isActive must be a boolean" });
-        return;
-      }
-
-      service.isActive = isActive;
+    const parsedIsActive = parseBoolean(isActive);
+    if (parsedIsActive === null) {
+      res.status(400).json({ success: false, message: "isActive must be a boolean" });
+      return;
     }
+    if (parsedIsActive !== undefined) service.isActive = parsedIsActive;
 
     await service.save();
 

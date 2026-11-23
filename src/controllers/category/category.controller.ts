@@ -76,9 +76,14 @@ export const getSingleCategory = async (req: Request, res: Response): Promise<an
  */
 export const updateCategory = async (req: Request, res: Response): Promise<any> => {
   try {
+    // Accepts JSON or multipart; a new icon arrives as the `catPic` file.
+    const catPic = req.file as any;
+    const updates = { ...req.body };
+    if (catPic) updates.image = catPic.location || catPic.path;
+
     const category = await Category.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      updates,
       { new: true, runValidators: true }
     );
 

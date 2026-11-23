@@ -5,6 +5,8 @@ import {
   BookingType as PlatformBookingType,
 } from "../platform/domain/enums";
 
+export type ChefResponseStatus = "pending" | "accepted" | "declined";
+
 export interface IBooking extends Document {
   bookingNumber: string;
   customerId: Schema.Types.ObjectId;
@@ -14,6 +16,24 @@ export interface IBooking extends Document {
 
   chefId?: Schema.Types.ObjectId;
   chefCategory?: Schema.Types.ObjectId;
+
+  /** The assigned chef's answer to the assignment (see chefBookingResponse.controller). */
+  chefResponse?: {
+    chefId?: Schema.Types.ObjectId;
+    status: ChefResponseStatus;
+    assignedAt?: Date;
+    respondedAt?: Date;
+    reason?: string;
+    /** Booking status before the chef was assigned — restored if the chef declines. */
+    previousStatus?: string;
+  };
+  /** Chefs who turned this booking down, so admins don't reassign it to them by mistake. */
+  declinedChefs?: Array<{
+    chefId: Schema.Types.ObjectId;
+    chefName?: string;
+    reason?: string;
+    declinedAt: Date;
+  }>;
 
   workflow?: string;
 
@@ -199,7 +219,28 @@ const BookingSchema = new Schema<IBooking>(
 
     quotationId: { type: Schema.Types.ObjectId, ref: "Quotation" },
 
-    transactnRef: { type: String, required: true, index: true, default: "" },
+    chefResponse: {
+      chefId: { type: Schema.Types.ObjectId, ref: "User" },
+      status: { type: String, enum: ["pending", "accepted", "declined"] },
+      assignedAt: { type: Date },
+      respondedAt: { type: Date },
+      reason: { type: String },
+      previousStatus: { type: String },
+    },
+    declinedChefs: [
+      {
+        chefId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+        chefName: { type: String },
+        reason: { type: String },
+        declinedAt: { type: Date, required: true },
+      },
+    ],
+
+    // Optional, matching the app's booking schema (platform/.../booking.schema.ts) that
+    // writes this same collection: unpaid / pending-payment bookings have no reference
+    // yet. Marking it required made every admin save on such a booking fail validation
+    // (e.g. "Error assigning chef").
+    transactnRef: { type: String, index: true, default: "" },
   },
   {
     timestamps: true,

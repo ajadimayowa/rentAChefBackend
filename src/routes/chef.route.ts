@@ -11,6 +11,7 @@ import {
     checkChefAvailability,
 } from "../controllers/chef.controller";
 import { getAllChefLevels } from "../controllers/chefLevel.controller";
+import { respondToBookingAssignment } from "../controllers/chefBookingResponse.controller";
 import { isAdmin } from "../middleware/isAdmin";
 import uploadAdImages from "../middleware/upload";
 import { requireAdminAuth } from "../middleware/auth/adminAuth.middleware";
@@ -127,6 +128,9 @@ router.get("/chef/dashboard", requireChefAuth, getChefDashboard);
  *         description: OK
  */
 router.get("/chef/bookings", requireChefAuth, getChefBookings);
+
+// The assigned chef accepts or declines a booking: { action: "accept" | "decline", reason? }
+router.post("/chef/bookings/:id/respond", requireChefAuth, respondToBookingAssignment);
 /**
  * @openapi
  * /chef/{id}:

@@ -1,3 +1,4 @@
+import { notifyAdmins } from '../../services/adminNotifications';
 import { Request, Response } from 'express';
 import { AuthError, registerCustomer } from '../../services/auth/auth.service';
 import { sendWelcomeEmail } from '../../services/email/rentAChef/usersEmailNotifs';
@@ -39,6 +40,14 @@ export const register = async (req: Request, res: Response): Promise<any> => {
     } catch (error) {
       console.error(error);
     }
+
+    void notifyAdmins({
+      type: 'new-customer',
+      title: 'New client sign-up',
+      message: `${user.fullName || user.email} created an account.`,
+      link: `/admin/users/${String(user._id)}`,
+      metadata: { userId: String(user._id) },
+    });
 
     return res.status(201).json({
       success: true,
