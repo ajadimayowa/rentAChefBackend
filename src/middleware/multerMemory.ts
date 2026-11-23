@@ -1,5 +1,6 @@
 import multer, { FileFilterCallback } from "multer";
 import path from "path";
+import { MAX_UPLOAD_BYTES } from "./upload";
 
 const allowed = /jpeg|jpg|png|pdf/;
 
@@ -16,7 +17,7 @@ const fileFilter: multer.Options['fileFilter'] = (req, file, cb) => {
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: MAX_UPLOAD_BYTES },
   fileFilter,
 });
 

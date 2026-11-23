@@ -1,4 +1,6 @@
 import express from 'express';
+import multer from 'multer';
+import { MAX_UPLOAD_LABEL } from './middleware/upload';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import connectDB from './config/db';
@@ -32,6 +34,7 @@ import residentialTestingSlotRoutes from './routes/residentialTestingSlot.routes
 import packageRoutes from './routes/package.routes';
 import menuTypesRoutes from './routes/menuTypes.routes';
 import assignedBookingNumberRoutes from './routes/assignedBookingNumber.routes';
+import messagingRoutes from './routes/messaging.routes';
 import { verifyEmailTransport } from './services/email/emailService';
 
 
@@ -66,6 +69,9 @@ app.use(`${apiPrefix}swagger`, swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Routes
 app.use(apiPrefix, authRoutes);
+// Must come before adminRoutes: its catch-all GET/PUT/DELETE /admin/:id would
+// otherwise swallow /admin/conversations and /admin/notifications (treating them as admin ids).
+app.use(apiPrefix, messagingRoutes);
 app.use(apiPrefix, adminRoutes);
 app.use(apiPrefix, chefRoutes);
 app.use(apiPrefix, categoryRoutes);
@@ -95,6 +101,24 @@ app.use(apiPrefix, assignedBookingNumberRoutes);
 
 
 
+
+// Upload errors (file over the 2 MB cap, wrong type) → a clear 400 instead of Express's HTML 500.
+const uploadErrorHandler: express.ErrorRequestHandler = (err, _req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    const message =
+      err.code === "LIMIT_FILE_SIZE"
+        ? `File is too large. The maximum upload size is ${MAX_UPLOAD_LABEL}.`
+        : err.message;
+    res.status(400).json({ success: false, message });
+    return;
+  }
+  if (typeof err?.message === "string" && /only .*(allowed)/i.test(err.message)) {
+    res.status(400).json({ success: false, message: err.message });
+    return;
+  }
+  next(err);
+};
+app.use(uploadErrorHandler);
 
 // Server
 const PORT = process.env.PORT || 5000;

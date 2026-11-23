@@ -5,6 +5,7 @@ import User from "../models/User.model";
 import { BookingStatus, PaymentStatus } from "../platform/domain/enums";
 import { bestEffortBookingDate, bestEffortGuestCount, minorToNaira } from "../utils/bookingStatus";
 import { sendBookingNotificationEmail } from "../services/email/rentAChef/bookingEmailNotifications";
+import { notifyUser } from "../services/userNotifications";
 
 const firstNameOf = (fullName?: string) => (fullName || "there").trim().split(" ")[0];
 
@@ -109,6 +110,17 @@ export const updateAdminBookingStatus = async (req: Request, res: Response): Pro
     booking.timeline.push({ status, changedBy: actorId, changedAt: new Date() });
     await booking.save();
 
+    if (booking.chefId) {
+      void notifyUser({
+        userId: booking.chefId as any,
+        type: "booking-status-update",
+        title: `Booking ${booking.bookingNumber} updated`,
+        message: `The booking status is now "${status}".`,
+        link: `/chef/bookings/${booking._id}`,
+        metadata: { bookingId: String(booking._id), status },
+      });
+    }
+
     // "Admin Reviewed" is the closest thing this system has to an explicit "approved" status.
     if (status === BookingStatus.ADMIN_REVIEW && booking.customerId) {
       const customer = await User.findById(booking.customerId).select("fullName email");
@@ -158,39 +170,71 @@ export const assignAdminBookingChef = async (req: Request, res: Response): Promi
     }
 
     const actorId = (req as any).user?._id ? String((req as any).user._id) : "ADMIN";
+    const previousChefId = booking.chefId ? String(booking.chefId) : "";
+    const isReassignment = Boolean(previousChefId) && previousChefId !== String(chef._id);
+
+    // Remember the status from before any chef was assigned, so a decline can restore it.
+    const previousStatus =
+      booking.status !== BookingStatus.CHEF_ASSIGNED
+        ? booking.status
+        : booking.chefResponse?.previousStatus || booking.status;
 
     booking.chefId = chef._id as any;
     booking.status = BookingStatus.CHEF_ASSIGNED;
+    // Every (re)assignment waits for the chef to accept or decline.
+    booking.chefResponse = {
+      chefId: chef._id as any,
+      status: "pending",
+      assignedAt: new Date(),
+      previousStatus,
+    };
     booking.timeline = booking.timeline || [];
     booking.timeline.push({
       status: BookingStatus.CHEF_ASSIGNED,
       changedBy: actorId,
       changedAt: new Date(),
-      reason: `Chef ${chef.fullName} manually assigned by admin`,
+      reason: isReassignment
+        ? `Booking reassigned to chef ${chef.fullName} by admin — awaiting the chef's confirmation`
+        : `Chef ${chef.fullName} assigned by admin — awaiting the chef's confirmation`,
     });
     await booking.save();
 
-    if (chef.email) {
-      await sendBookingNotificationEmail({
-        firstName: firstNameOf(chef.fullName),
-        email: chef.email,
-        heading: "A new booking has been assigned to you",
-        message: "A new booking has been assigned to you, kindly login to your account to see the details of the booking.",
-        bookingNumber: booking.bookingNumber,
-      });
-    }
+    void notifyUser({
+      userId: chef._id as any,
+      type: "booking-assignment",
+      title: "New booking assigned to you",
+      message: `Booking ${booking.bookingNumber} is waiting for you to accept or decline it.`,
+      link: `/chef/bookings/${booking._id}`,
+      metadata: { bookingId: String(booking._id) },
+    });
 
-    if (booking.customerId) {
-      const customer = await User.findById(booking.customerId).select("fullName email");
-      if (customer?.email) {
+    // The assignment is saved at this point — an email problem must not turn it into
+    // an "Error assigning chef" response.
+    try {
+      if (chef.email) {
         await sendBookingNotificationEmail({
-          firstName: firstNameOf(customer.fullName),
-          email: customer.email,
-          heading: "A chef has been assigned to your booking",
-          message: "A chef has been assigned to your booking",
+          firstName: firstNameOf(chef.fullName),
+          email: chef.email,
+          heading: "A new booking has been assigned to you",
+          message: "A new booking has been assigned to you. Kindly log in to your account to review it and accept or decline it.",
           bookingNumber: booking.bookingNumber,
         });
       }
+
+      if (booking.customerId) {
+        const customer = await User.findById(booking.customerId).select("fullName email");
+        if (customer?.email) {
+          await sendBookingNotificationEmail({
+            firstName: firstNameOf(customer.fullName),
+            email: customer.email,
+            heading: "A chef has been assigned to your booking",
+            message: "A chef has been assigned to your booking",
+            bookingNumber: booking.bookingNumber,
+          });
+        }
+      }
+    } catch (emailError) {
+      console.error("Assign chef: notification email failed:", emailError);
     }
 
     return res.status(200).json({

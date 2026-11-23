@@ -1,3 +1,4 @@
+import { formatPersonName } from "../utils/formatName";
 import { Request, Response } from "express";
 import User from "../models/User.model";
 import Category from "../models/Category";
@@ -65,9 +66,20 @@ export const createChef = async (req: Request, res: Response): Promise<any> => {
     } = req.body;
      const staffId = generateStaffId();
 
-     const fullName = name.trim();
+     const fullName = formatPersonName(name);
      const firstName = fullName.split(" ")[0];
-     const phoneNumber = formatNigerianPhoneNumber(phone);
+
+    // Phone numbers are always stored as +234XXXXXXXXXX.
+    let phoneNumber: string;
+    try {
+      phoneNumber = formatNigerianPhoneNumber(String(phone ?? ""));
+    } catch {
+      return res.status(400).json({ message: "Enter a valid Nigerian phone number" });
+    }
+
+    if (!chefPic) {
+      return res.status(400).json({ message: "A profile picture is required" });
+    }
 
     // console.log({ adminSent: req.body });
 
@@ -142,6 +154,8 @@ export const createChef = async (req: Request, res: Response): Promise<any> => {
         dupCount = results.filter((r: any) => r.status === 'rejected' && r.reason && r.reason.code === 11000).length;
       }
 
+      // Return the chef level as {id, name} like the list does, not a bare id.
+      await chef.populate("chefDetails.chefLevel", "name description");
       const [payload] = await attachServicesOffered([chef]);
 
       return res.status(201).json({
@@ -388,7 +402,7 @@ export const getChefBookings = async (req: Request, res: Response): Promise<any>
 
     const [bookings, total] = await Promise.all([
       BookingModel.find(filter)
-        .select("bookingNumber customerId serviceId workflow status paymentStatus pricingSnapshot startDate bookingData createdAt")
+        .select("bookingNumber customerId serviceId workflow status paymentStatus pricingSnapshot startDate bookingData createdAt chefResponse")
         .populate("customerId", "fullName")
         .populate("serviceId", "name")
         .sort({ createdAt: -1 })
@@ -406,6 +420,8 @@ export const getChefBookings = async (req: Request, res: Response): Promise<any>
         customerName: b.customerId?.fullName || "Unassigned",
         serviceName: b.serviceId?.name || "—",
         workflow: b.workflow,
+        // Older assignments have no chefResponse — they still await the chef's answer.
+        chefResponseStatus: b.chefResponse?.status ?? "pending",
         status: b.status,
         paymentStatus: b.paymentStatus,
         date: bestEffortBookingDate(b),
@@ -452,12 +468,23 @@ export const updateChef = async (req: Request, res: Response): Promise<any> => {
     const updates: Record<string, any> = {};
 
     if (req.body.name !== undefined) {
-      updates.fullName = req.body.name;
+      updates.fullName = formatPersonName(req.body.name);
     }
 
     for (const key of topLevelUpdates) {
       if (req.body[key] !== undefined) {
         updates[key] = req.body[key];
+      }
+    }
+
+    // The admin form sends `phone`; other clients send `phoneNumber`. Either way it
+    // is stored as +234XXXXXXXXXX.
+    const rawPhone = req.body.phone ?? req.body.phoneNumber;
+    if (rawPhone !== undefined) {
+      try {
+        updates.phoneNumber = formatNigerianPhoneNumber(String(rawPhone));
+      } catch {
+        return res.status(400).json({ success: false, message: "Enter a valid Nigerian phone number" });
       }
     }
 
@@ -482,7 +509,9 @@ export const updateChef = async (req: Request, res: Response): Promise<any> => {
     const chef = await User.findOneAndUpdate({ _id: id, userType: "Chef" }, updates, {
       new: true,
       runValidators: true,
-    }).select("-password");
+    })
+      .select("-password")
+      .populate("chefDetails.chefLevel", "name description");
 
     if (!chef) {
       return res.status(404).json({ success: false, message: "Chef not found" });

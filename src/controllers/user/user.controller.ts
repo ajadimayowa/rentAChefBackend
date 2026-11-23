@@ -3,6 +3,16 @@ import bcrypt from "bcryptjs";
 import mongoose from "mongoose";
 import * as crypto from "crypto";
 import UserModel from "../../models/User.model";
+import { formatNigerianPhoneNumber } from "../../utils/otpUtils";
+
+/** Phone numbers are always stored as +234XXXXXXXXXX; null means the input is invalid. */
+const normalizePhone = (value: unknown): string | null => {
+  try {
+    return formatNigerianPhoneNumber(String(value ?? ""));
+  } catch {
+    return null;
+  }
+};
 import { BookingModel } from "../../models/Booking";
 import {
   CLOSED_BOOKING_STATUSES,
@@ -355,11 +365,16 @@ export const updateNok = async (req: Request, res: Response): Promise<any> => {
     return res.status(400).json({ message: 'All NOK fields are required' });
   }
 
+  const nokPhone = normalizePhone(phone);
+  if (!nokPhone) {
+    return res.status(400).json({ success: false, message: 'Enter a valid Nigerian phone number for your next of kin.' });
+  }
+
   try {
     const updatedUser = await UserModel.findByIdAndUpdate(
       userId,
       {
-        nok: { fullName, phone, relationship },
+        nok: { fullName, phone: nokPhone, relationship },
       },
       { new: true, runValidators: true }
     );
@@ -418,6 +433,15 @@ export const updateBioData = async (req: Request, res: Response): Promise<any> =
     return res.status(400).json({ message: 'At least one field should be provided to update' });
   }
 
+  let formattedPhone: string | undefined;
+  if (phoneNumber !== undefined && phoneNumber !== '') {
+    const normalized = normalizePhone(phoneNumber);
+    if (!normalized) {
+      return res.status(400).json({ success: false, message: 'Enter a valid Nigerian phone number.' });
+    }
+    formattedPhone = normalized;
+  }
+
   try {
     const updatedUser = await UserModel.findByIdAndUpdate(
       userId,
@@ -426,7 +450,7 @@ export const updateBioData = async (req: Request, res: Response): Promise<any> =
         gender,
         dob,
         maritalStatus,
-        phoneNumber
+        phoneNumber: formattedPhone
       },
       { new: true, runValidators: true }
     );

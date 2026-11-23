@@ -6,6 +6,7 @@ export interface IServiceCategory extends Document {
   description?: string;
   slug?: string;
   sortOrder?: number;
+  image?: string;
   isActive: boolean;
 }
 
@@ -29,6 +30,7 @@ const serviceCategorySchema = new Schema<IServiceCategory>(
     description: { type: String, default: "" },
     slug: { type: String, unique: true, lowercase: true, trim: true },
     sortOrder: { type: Number, default: 0 },
+    image: { type: String, default: "" },
     isActive: { type: Boolean, default: true },
   },
   {

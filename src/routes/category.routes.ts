@@ -106,7 +106,7 @@ router.get("/category/:id", getSingleCategory);
  *             schema:
  *               $ref: '#/components/schemas/Category'
  */
-router.put("/category/:id", updateCategory);
+router.put("/category/:id", uploadAdImages.single("catPic"), updateCategory);
 /**
  * @openapi
  * /category/{id}:

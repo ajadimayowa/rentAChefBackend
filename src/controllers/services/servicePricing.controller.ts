@@ -26,6 +26,15 @@ const buildTargetMatchFilter = (serviceId?: any, specialServiceId?: any, chefCat
   return { $and: clauses };
 };
 
+// Create/update responses are populated the same way as the list, so the admin can
+// show a saved rule (and count it under its chef category) without reloading.
+const populatePricing = (doc: any) =>
+  doc.populate([
+    { path: "serviceId", select: "name code" },
+    { path: "specialServiceId", select: "title description" },
+    { path: "chefCategoryId", select: "name slug description tasks" },
+  ]);
+
 // CREATE a new ServicePricing
 export const createServicePricing = async (req: Request, res: Response):Promise<any> => {
   try {
@@ -142,6 +151,7 @@ export const createServicePricing = async (req: Request, res: Response):Promise<
       isActive: isActive === undefined ? true : Boolean(isActive),
     });
 
+    await populatePricing(servicePricing);
     res.status(201).json({ success: true, data: servicePricing });
   } catch (error) {
     console.error(error);
@@ -375,6 +385,7 @@ export const updateServicePricing = async (req: Request, res: Response):Promise<
 
     await servicePricing.save();
 
+    await populatePricing(servicePricing);
     res.status(200).json({ success: true, data: servicePricing });
   } catch (error) {
     console.error(error);

@@ -11,6 +11,10 @@ export interface INotification extends Document {
   message?: string;
   body?: string;
   metadata?: Record<string, unknown>;
+  /** Web-portal path to open when the notification is clicked, e.g. /chef/bookings/123. */
+  link?: string;
+  /** Id of the record the notification is about (the mobile app opens it on tap). */
+  resourceId?: string;
   isRead: boolean;
   sentAt?: Date;
   readAt?: Date;
@@ -33,7 +37,9 @@ const NotificationSchema: Schema = new Schema({
       'payment-receipt',
       'feedback-request',
       'event-invitation',
-      'system-alert'
+      'system-alert',
+      'booking-assignment',
+      'booking-status-update'
     ],
   },
   channel: {
@@ -45,6 +51,8 @@ const NotificationSchema: Schema = new Schema({
   message: { type: String },
   body: { type: String },
   metadata: { type: Schema.Types.Mixed },
+  link: { type: String },
+  resourceId: { type: String },
   isRead: { type: Boolean, default: false },
   sentAt: { type: Date },
   readAt: { type: Date },

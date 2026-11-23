@@ -11,7 +11,7 @@ export const getAllChefLevels = async (_req: Request, res: Response): Promise<an
     return res.status(200).json({
       success: true,
       message: "Chef levels fetched successfully",
-      payload: levels.map((level) => ({ id: level._id, name: level.name })),
+      payload: levels.map((level) => ({ id: level._id, name: level.name, image: level.image || undefined })),
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Failed to fetch chef levels", error });

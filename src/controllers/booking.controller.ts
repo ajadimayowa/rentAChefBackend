@@ -1,3 +1,4 @@
+import { notifyAdmins } from '../services/adminNotifications';
 import { Request, Response } from 'express';
 import axios from 'axios';
 import { buildChefPlatformModule } from '../platform/bootstrap';
@@ -135,6 +136,16 @@ export const createBooking = async (req: Request, res: Response): Promise<void> 
       });
     }
 
+    if (bookingId) {
+      void notifyAdmins({
+        type: 'new-booking',
+        title: 'New booking',
+        message: `A ${String(req.body.workflow || 'service').replace(/_/g, ' ').toLowerCase()} booking was placed${isVerifiedPayment ? ' and paid' : ''}.`,
+        link: `/admin/bookings/${bookingId}`,
+        metadata: { bookingId },
+      });
+    }
+
     res.status(201).json({ success: true, data: booking });
   } catch (error: any) {
     res.status(400).json({ success: false, message: error.message });
@@ -216,6 +227,15 @@ export const initializeQuotationPayment = async (req: Request, res: Response): P
 export const confirmPaymentWebhook = async (req: Request, res: Response): Promise<void> => {
   try {
     const payment = await moduleRef.adminBookingService.confirmPayment(String(req.params.reference), req.body);
+    const paidBookingId = String((payment as any)?.bookingId ?? '');
+    // confirmPayment returns null for an unknown reference — nothing was confirmed then.
+    if (payment) void notifyAdmins({
+      type: 'payment-confirmed',
+      title: 'Payment confirmed',
+      message: `Payment ${String(req.params.reference)} was confirmed.`,
+      link: paidBookingId ? `/admin/bookings/${paidBookingId}` : undefined,
+      metadata: { reference: String(req.params.reference), bookingId: paidBookingId || undefined },
+    });
     res.status(200).json({ success: true, data: payment });
   } catch (error: any) {
     res.status(400).json({ success: false, message: error.message });

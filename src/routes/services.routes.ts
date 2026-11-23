@@ -8,6 +8,11 @@ import {
 } from "../controllers/services/services.controller";
 import { requireAdminAuth } from "../middleware/auth/adminAuth.middleware";
 
+import { createUpload } from "../middleware/upload";
+
+// Service pictures arrive as the multipart `image` field.
+const uploadServiceImage = createUpload("images/services").single("image");
+
 const router = Router();
 
 /**
@@ -31,7 +36,7 @@ const router = Router();
  *             schema:
  *               $ref: '#/components/schemas/ServiceResponse'
  */
-router.post("/service/create", requireAdminAuth, createService);
+router.post("/service/create", requireAdminAuth, uploadServiceImage, createService);
 
 /**
  * @openapi
@@ -100,7 +105,7 @@ router.get("/service/:id", getServiceById);
  *             schema:
  *               $ref: '#/components/schemas/ServiceResponse'
  */
-router.put("/service/:id", requireAdminAuth, updateService);
+router.put("/service/:id", requireAdminAuth, uploadServiceImage, updateService);
 
 /**
  * @openapi

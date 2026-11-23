@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import mongoose from "mongoose";
 import { BookingModel } from "../models/Booking";
+import Procurement from "../models/Procurement";
 import { bestEffortBookingDate, bestEffortGuestCount, minorToNaira } from "../utils/bookingStatus";
 
 /**
@@ -37,8 +38,14 @@ export const getBookingDetail = async (req: Request, res: Response): Promise<any
     }
 
     const json = booking.toJSON() as any;
-    const { customerId, chefId, serviceId, ...rest } = json;
+    const { customerId, chefId, serviceId, declinedChefs, ...rest } = json;
+    // Who declined (and why) is for admins only; chefs and customers just see the current state.
+    if (isAdmin) rest.declinedChefs = declinedChefs || [];
+    // Bookings assigned before chef confirmation existed still await the chef's answer.
+    if (chefId && !rest.chefResponse?.status) rest.chefResponse = { status: "pending" };
     const pricing = rest.pricingSnapshot || {};
+    // Procurement records (PDF + amount) the admin raised for this booking, newest first.
+    const procurements = await Procurement.find({ bookingId: booking._id }).sort({ createdAt: -1 });
 
     return res.status(200).json({
       success: true,
@@ -47,6 +54,7 @@ export const getBookingDetail = async (req: Request, res: Response): Promise<any
         customer: customerId || null,
         chef: chefId || null,
         service: serviceId || null,
+        procurements: procurements.map((p) => p.toJSON()),
         date: bestEffortBookingDate(booking),
         guests: bestEffortGuestCount(booking.bookingData),
         pricingSnapshot: {

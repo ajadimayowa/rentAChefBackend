@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document, Model } from "mongoose";
+import mongoose, { Schema, Document, Model, Types } from "mongoose";
 
 export interface IService extends Document {
   categoryId: Schema.Types.ObjectId;
@@ -6,11 +6,13 @@ export interface IService extends Document {
   name: string;
   description?: string;
   icon?: string;
+  image?: string;
   workflow?: string;
   supportsChefMenu?: boolean;
   supportsCustomerMenuUpload?: boolean;
   supportsProcurement?: boolean;
-  allowedChefLevels: ("sous" | "executive" | "junior" | "senior" | "pro" | "head")[];
+  /** Chef levels (Category docs) allowed to deliver this service; empty = any level. */
+  allowedChefLevels: Types.ObjectId[];
   bookingType?: "instant" | "quotation";
   isActive: boolean;
   active?: boolean;
@@ -26,7 +28,9 @@ const ServiceSchema = new Schema<IService>(
 
     name: { type: String, required: true },
     description: { type: String, default: "" },
+    // Legacy icon-font name still read by older mobile builds; the admin now uploads `image` instead.
     icon: { type: String, default: "" },
+    image: { type: String, default: "" },
 
     code: { type: String, unique: true, sparse: true, index: true },
 
@@ -36,10 +40,7 @@ const ServiceSchema = new Schema<IService>(
     supportsCustomerMenuUpload: { type: Boolean, default: false },
     supportsProcurement: { type: Boolean, default: true },
 
-    allowedChefLevels: {
-      type: [String],
-      enum: ["sous","executive","junior","senior","pro","head"],
-    },
+    allowedChefLevels: [{ type: Schema.Types.ObjectId, ref: "Category" }],
 
     bookingType: {
       type: String,
