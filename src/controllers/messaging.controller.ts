@@ -124,6 +124,7 @@ export const adminUnreadCount = async (_req: Request, res: Response): Promise<an
     const count = await Conversation.countDocuments({ unreadForAdmin: { $gt: 0 } });
     return res.status(200).json({ success: true, payload: { count } });
   } catch (error) {
+    console.error("adminUnreadCount error:", error);
     return res.status(500).json({ success: false, message: "Could not load unread count" });
   }
 };

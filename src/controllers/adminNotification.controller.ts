@@ -43,6 +43,7 @@ export const adminNotificationUnreadCount = async (req: Request, res: Response):
     const count = await AdminNotification.countDocuments({ ...feedFilterFor(admin), readBy: { $ne: admin._id } });
     return res.status(200).json({ success: true, payload: { count } });
   } catch (error) {
+    console.error("adminNotification error:", error);
     return res.status(500).json({ success: false, message: "Could not load unread count" });
   }
 };
@@ -57,6 +58,7 @@ export const markAdminNotificationRead = async (req: Request, res: Response): Pr
     await AdminNotification.updateOne({ _id: id }, { $addToSet: { readBy: (req as any).user._id } });
     return res.status(200).json({ success: true });
   } catch (error) {
+    console.error("adminNotification error:", error);
     return res.status(500).json({ success: false, message: "Could not mark as read" });
   }
 };
@@ -71,6 +73,7 @@ export const markAllAdminNotificationsRead = async (req: Request, res: Response)
     );
     return res.status(200).json({ success: true });
   } catch (error) {
+    console.error("adminNotification error:", error);
     return res.status(500).json({ success: false, message: "Could not mark all as read" });
   }
 };
