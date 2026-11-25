@@ -56,29 +56,30 @@ const app = express();
 // Middlewares
 if (process.env.NODE_ENV === 'development') app.use(morgan('dev'));
 
-// CLIENT_URL is a comma-separated list of the websites allowed to call this API,
-// e.g. "https://rentachefapp.com,http://localhost:5173". Each site is allowed with
-// and without "www." automatically. Unset → any origin. The mobile app sends no
-// Origin header, so CORS never affects it.
+// Websites allowed to call this API from a browser: the Rent A Chef sites below,
+// plus any extras in CLIENT_URL (comma-separated, e.g. "http://localhost:5173").
+// A bare domain is allowed with and without "www.". If CLIENT_URL is unset, any
+// origin is allowed. The mobile app sends no Origin header, so CORS never affects it.
+const RENT_A_CHEF_SITES = ['https://rentachefapp.com', 'https://dev.rentachefapp.com'];
+
 const withWwwVariant = (origin: string): string[] => {
-  const match = origin.match(/^(https?:\/\/)(www\.)?([^/]+)$/i);
-  if (!match || /^(localhost|\d+\.\d+\.\d+\.\d+)(:\d+)?$/i.test(match[3])) return [origin];
-  const [, scheme, , host] = match;
-  return [`${scheme}${host}`, `${scheme}www.${host}`];
+  const match = origin.match(/^(https?:\/\/)(www\.)?([^/:]+)(:\d+)?$/i);
+  if (!match) return [origin];
+  const [, scheme, , host, port = ''] = match;
+  // Only bare domains like rentachefapp.com get a www twin — not subdomains, localhost or IPs.
+  if (host.split('.').length !== 2) return [origin];
+  return [`${scheme}${host}${port}`, `${scheme}www.${host}${port}`];
 };
 
-const allowedOrigins = [
-  ...new Set(
-    (process.env.CLIENT_URL ?? '')
-      .split(',')
-      .map((o) => o.trim().replace(/\/+$/, ''))
-      .filter(Boolean)
-      .flatMap(withWwwVariant)
-  ),
-];
+const extraOrigins = (process.env.CLIENT_URL ?? '')
+  .split(',')
+  .map((o) => o.trim().replace(/\/+$/, ''))
+  .filter(Boolean);
+
+const allowedOrigins = [...new Set([...RENT_A_CHEF_SITES, ...extraOrigins].flatMap(withWwwVariant))];
 
 app.use(cors({
-  origin: allowedOrigins.length === 0 ? true : allowedOrigins,
+  origin: extraOrigins.length === 0 ? true : allowedOrigins,
   credentials: true,
 }));
 app.use(express.json());
