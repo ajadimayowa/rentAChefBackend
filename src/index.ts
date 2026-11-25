@@ -56,8 +56,29 @@ const app = express();
 // Middlewares
 if (process.env.NODE_ENV === 'development') app.use(morgan('dev'));
 
+// CLIENT_URL is a comma-separated list of the websites allowed to call this API,
+// e.g. "https://rentachefapp.com,http://localhost:5173". Each site is allowed with
+// and without "www." automatically. Unset → any origin. The mobile app sends no
+// Origin header, so CORS never affects it.
+const withWwwVariant = (origin: string): string[] => {
+  const match = origin.match(/^(https?:\/\/)(www\.)?([^/]+)$/i);
+  if (!match || /^(localhost|\d+\.\d+\.\d+\.\d+)(:\d+)?$/i.test(match[3])) return [origin];
+  const [, scheme, , host] = match;
+  return [`${scheme}${host}`, `${scheme}www.${host}`];
+};
+
+const allowedOrigins = [
+  ...new Set(
+    (process.env.CLIENT_URL ?? '')
+      .split(',')
+      .map((o) => o.trim().replace(/\/+$/, ''))
+      .filter(Boolean)
+      .flatMap(withWwwVariant)
+  ),
+];
+
 app.use(cors({
-  origin: process.env.CLIENT_URL || '*',
+  origin: allowedOrigins.length === 0 ? true : allowedOrigins,
   credentials: true,
 }));
 app.use(express.json());
