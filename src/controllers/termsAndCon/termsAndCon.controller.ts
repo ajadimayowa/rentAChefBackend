@@ -15,9 +15,15 @@ const isValidObjectId = (value: unknown): value is string => {
 
 export const createTermsAndCon = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { description, termsUrl, serviceId, categoryId, specialMenuId } = req.body;
+    const { title, description, termsUrl, serviceId, categoryId, specialMenuId } = req.body;
+    const normalizedTitle = typeof title === "string" ? title.trim() : "";
     const normalizedDescription = typeof description === "string" ? description.trim() : "";
     const normalizedTermsUrl = typeof termsUrl === "string" ? termsUrl.trim() : "";
+
+    if (!normalizedTitle) {
+      res.status(400).json({ success: false, message: "title is required" });
+      return;
+    }
 
     if (!normalizedDescription) {
       res.status(400).json({ success: false, message: "description is required" });
@@ -71,6 +77,7 @@ export const createTermsAndCon = async (req: Request, res: Response): Promise<vo
     }
 
     const record = await TermsAndConModel.create({
+      title: normalizedTitle,
       description: normalizedDescription,
       termsUrl: normalizedTermsUrl || undefined,
       serviceId: serviceId || undefined,
@@ -159,7 +166,7 @@ export const getTermsAndConById = async (req: Request, res: Response): Promise<v
 export const updateTermsAndCon = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { description, termsUrl, serviceId, categoryId, specialMenuId } = req.body;
+    const { title, description, termsUrl, serviceId, categoryId, specialMenuId } = req.body;
 
     if (!Types.ObjectId.isValid(id)) {
       res.status(400).json({ success: false, message: "Invalid TermsAndCon id" });
@@ -170,6 +177,15 @@ export const updateTermsAndCon = async (req: Request, res: Response): Promise<vo
     if (!record) {
       res.status(404).json({ success: false, message: "TermsAndCon not found" });
       return;
+    }
+
+    if (title !== undefined) {
+      const normalizedTitle = typeof title === "string" ? title.trim() : "";
+      if (!normalizedTitle) {
+        res.status(400).json({ success: false, message: "title is required" });
+        return;
+      }
+      record.title = normalizedTitle;
     }
 
     if (description !== undefined) {

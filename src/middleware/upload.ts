@@ -73,3 +73,48 @@ export const uploadProcurementPdf = multer({
     else cb(new Error("Only PDF files are allowed"));
   },
 });
+
+/**
+ * Customers' own menus (PDF) attached to a booking request, e.g. Alase
+ * "Menu & cooking requirements". PDF only, 2 MB max.
+ */
+export const uploadCustomerMenuPdf = multer({
+  storage: multerS3({
+    s3: s3Client,
+    bucket: AWS_BUCKET_NAME,
+    key: (_req, file, cb) => {
+      const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(-80) || "menu.pdf";
+      cb(null, `documents/customer-menus/${Date.now()}-${safeName}`);
+    },
+    contentType: (_req, _file, cb) => cb(null, "application/pdf"),
+    contentDisposition: "inline",
+    acl: "public-read",
+  }),
+  limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    const isPdf = file.mimetype === "application/pdf" && /\.pdf$/i.test(file.originalname);
+    if (isPdf) cb(null, true);
+    else cb(new Error("Only PDF files are allowed"));
+  },
+});
+
+/** Invoice PDFs (admin → booking). PDF only, 2 MB max. */
+export const uploadInvoicePdf = multer({
+  storage: multerS3({
+    s3: s3Client,
+    bucket: AWS_BUCKET_NAME,
+    key: (_req, file, cb) => {
+      const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(-80) || "invoice.pdf";
+      cb(null, `documents/invoices/${Date.now()}-${safeName}`);
+    },
+    contentType: (_req, _file, cb) => cb(null, "application/pdf"),
+    contentDisposition: "inline",
+    acl: "public-read",
+  }),
+  limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    const isPdf = file.mimetype === "application/pdf" && /\.pdf$/i.test(file.originalname);
+    if (isPdf) cb(null, true);
+    else cb(new Error("Only PDF files are allowed"));
+  },
+});

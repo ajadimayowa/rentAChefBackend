@@ -95,6 +95,17 @@ const router = Router();
  *                 enum:
  *                   - nigerian
  *                   - continental
+ *               menuKind:
+ *                 type: string
+ *                 enum:
+ *                   - classic
+ *                   - premium
+ *                   - signature
+ *               attributes:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 example: ["Starter", "Main", "Dessert"]
  *               pricingModel:
  *                 type: string
  *                 enum:
@@ -197,6 +208,17 @@ router.post("/menu", uploadAdImages.single("samplePicture"), createMenu);
  *         schema:
  *           type: string
  *         description: Case-insensitive search on title and description.
+ *       - in: query
+ *         name: menuKind
+ *         schema:
+ *           type: string
+ *           example: classic,premium
+ *         description: Filter by kind — classic, premium or signature (comma-separate for several).
+ *       - in: query
+ *         name: serviceId
+ *         schema:
+ *           type: string
+ *         description: Only menus for this service (relatedServiceId).
  *       - in: query
  *         name: sortBy
  *         required: false
@@ -307,6 +329,17 @@ router.get("/menu/:id", getMenu);
  *                 enum:
  *                   - nigerian
  *                   - continental
+ *               menuKind:
+ *                 type: string
+ *                 enum:
+ *                   - classic
+ *                   - premium
+ *                   - signature
+ *               attributes:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 example: ["Starter", "Main", "Dessert"]
  *               pricingModel:
  *                 type: string
  *                 enum:

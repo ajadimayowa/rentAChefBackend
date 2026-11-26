@@ -32,6 +32,7 @@ const NotificationSchema: Schema = new Schema({
       'chef-application-status',
       'general-announcement',
       'procurement-update',
+      'invoice-update',
       'menu-update',
       'service-update',
       'payment-receipt',

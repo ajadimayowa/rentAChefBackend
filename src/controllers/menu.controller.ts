@@ -1,9 +1,10 @@
 import { Request, Response } from "express";
-import Menu, { MenuClass, PricingModel } from "../models/Menu";
+import Menu, { MENU_KINDS, MenuClass, MenuKind, PricingModel } from "../models/Menu";
 import mongoose from "mongoose";
 import MenuTypes from "../models/MenuTypes";
+import { ServiceModel } from "../models/Service";
 
-const ALLOWED_MENU_CLASSES = ["nigerian", "continental"] as const;
+const ALLOWED_MENU_CLASSES = ["nigerian", "continental", "intercontinental"] as const;
 const ALLOWED_PRICING_MODELS = ["perhead", "plater"] as const;
 
 const normalizeOptionalEnumInput = (
@@ -70,6 +71,103 @@ const parseMenuCategoryIds = (
     return { ids: Array.from(new Set(ids)) };
 };
 
+/**
+ * Services a menu belongs to: `serviceIds` (array, JSON array string or repeated
+ * form fields) or, for older clients, a single `relatedServiceId`. Undefined when
+ * neither was sent. Every id must be a real service.
+ */
+const parseServiceIds = async (body: any): Promise<{ ids?: mongoose.Types.ObjectId[]; error?: string; status?: number }> => {
+    let raw: unknown = body.serviceIds;
+    if (raw === undefined) raw = body.relatedServiceId;
+    if (raw === undefined) return {};
+
+    let items: unknown[] = [];
+    if (Array.isArray(raw)) {
+        items = raw;
+    } else if (typeof raw === "string") {
+        const trimmed = raw.trim();
+        if (trimmed.startsWith("[")) {
+            try {
+                const parsed = JSON.parse(trimmed);
+                if (!Array.isArray(parsed)) return { error: "serviceIds must be a list.", status: 400 };
+                items = parsed;
+            } catch {
+                return { error: "serviceIds must be a list.", status: 400 };
+            }
+        } else {
+            items = trimmed ? trimmed.split(",") : [];
+        }
+    }
+
+    const unique = [...new Set(items.map((i) => String(i ?? "").trim()).filter(Boolean))];
+    if (unique.length === 0) return { error: "Select at least one service for this menu.", status: 400 };
+    if (!unique.every((id) => mongoose.Types.ObjectId.isValid(id))) return { error: "Invalid service id.", status: 400 };
+
+    const found = await ServiceModel.countDocuments({ _id: { $in: unique } });
+    if (found !== unique.length) return { error: "One or more selected services no longer exist.", status: 404 };
+
+    return { ids: unique.map((id) => new mongoose.Types.ObjectId(id)) };
+};
+
+const MAX_ATTRIBUTES = 10;
+const MAX_ATTRIBUTE_LENGTH = 40;
+
+/** menuKind from a request: "" / null clears it; anything else must be a known kind. */
+const parseMenuKind = (value: unknown): { kind?: MenuKind | null; error?: string } => {
+    if (value === undefined) return {};
+    const normalized = normalizeOptionalEnumInput(value);
+    if (normalized === undefined) return { kind: null };
+    if (!MENU_KINDS.includes(normalized as MenuKind)) {
+        return { error: `menuKind must be one of: ${MENU_KINDS.join(", ")}.` };
+    }
+    return { kind: normalized as MenuKind };
+};
+
+/**
+ * attributes from a request — an array, a JSON array string, repeated form
+ * fields, or "Starter · Main · Dessert" / "Starter, Main". Trimmed, de-duplicated
+ * (case-insensitive), order kept.
+ */
+const parseMenuAttributes = (value: unknown): { attributes?: string[]; error?: string } => {
+    if (value === undefined) return {};
+
+    let items: unknown[] = [];
+    if (Array.isArray(value)) {
+        items = value;
+    } else if (typeof value === "string") {
+        const trimmed = value.trim();
+        if (trimmed.startsWith("[")) {
+            try {
+                const parsed = JSON.parse(trimmed);
+                if (!Array.isArray(parsed)) return { error: "attributes must be a list." };
+                items = parsed;
+            } catch {
+                return { error: "attributes must be a list." };
+            }
+        } else {
+            items = trimmed.split(/[,·|]/);
+        }
+    } else if (value !== null) {
+        return { error: "attributes must be a list." };
+    }
+
+    const seen = new Set<string>();
+    const attributes: string[] = [];
+    for (const item of items) {
+        const text = String(item ?? "").trim();
+        if (!text || seen.has(text.toLowerCase())) continue;
+        if (text.length > MAX_ATTRIBUTE_LENGTH) {
+            return { error: `Each attribute must be ${MAX_ATTRIBUTE_LENGTH} characters or fewer.` };
+        }
+        seen.add(text.toLowerCase());
+        attributes.push(text);
+    }
+    if (attributes.length > MAX_ATTRIBUTES) {
+        return { error: `A menu can have at most ${MAX_ATTRIBUTES} attributes.` };
+    }
+    return { attributes };
+};
+
 const normalizeGroceries = (value: unknown): any[] => {
     return Array.isArray(value) ? value : [];
 };
@@ -100,9 +198,29 @@ export const createMenu = async (
             menuCategory,
             pricePerHead,
             chefId,
+            menuKind,
+            attributes,
         } = body;
 
         const uploadedFile = req.file as any;
+
+        const parsedKind = parseMenuKind(menuKind);
+        if (parsedKind.error) {
+            return res.status(400).json({ success: false, message: parsedKind.error });
+        }
+
+        const parsedAttributes = parseMenuAttributes(attributes);
+        if (parsedAttributes.error) {
+            return res.status(400).json({ success: false, message: parsedAttributes.error });
+        }
+
+        const parsedServices = await parseServiceIds(body);
+        if (parsedServices.error) {
+            return res.status(parsedServices.status ?? 400).json({ success: false, message: parsedServices.error });
+        }
+        if (!parsedServices.ids) {
+            return res.status(400).json({ success: false, message: "Select at least one service for this menu." });
+        }
 
         const { ids: menuCategoryIds, error: menuCategoryError } =
             parseMenuCategoryIds(menuCategory);
@@ -183,13 +301,19 @@ export const createMenu = async (
             menuCreatorType,
             title,
             description,
-            relatedServiceId,
+            relatedServiceId: parsedServices.ids[0],
+            serviceIds: parsedServices.ids,
             samplePicture,
             menuType,
             menuCategory:
                 menuCategoryIds?.map((id) => new mongoose.Types.ObjectId(id)) || [],
             pricePerHead: Number(pricePerHead),
+            attributes: parsedAttributes.attributes ?? [],
         };
+
+        if (parsedKind.kind) {
+            menuData.menuKind = parsedKind.kind;
+        }
 
         if (normalizedMenuClass !== undefined) {
             menuData.menuClass = normalizedMenuClass;
@@ -255,6 +379,9 @@ export const getMenus = async (
             menuClass,
             pricingModel,
       menuCategory,
+      menuKind,
+      serviceId,
+      relatedServiceId,
       search,
       sortBy = "createdAt",
       sortOrder = "desc",
@@ -302,6 +429,37 @@ export const getMenus = async (
     // Menu type
     if (menuType) {
       filter.menuType = menuType;
+    }
+
+    // Menu kind: ?menuKind=classic or ?menuKind=premium,signature
+    if (menuKind !== undefined && String(menuKind).trim() !== "") {
+      const kinds = String(menuKind)
+        .split(",")
+        .map((k) => k.trim().toLowerCase())
+        .filter(Boolean);
+      const unknown = kinds.find((k) => !MENU_KINDS.includes(k as MenuKind));
+      if (unknown) {
+        return res.status(400).json({
+          success: false,
+          message: `menuKind must be one of: ${MENU_KINDS.join(", ")}.`,
+        });
+      }
+      filter.menuKind = kinds.length === 1 ? kinds[0] : { $in: kinds };
+    }
+
+    // Service: ?serviceId= (or ?relatedServiceId=)
+    const serviceFilter = serviceId ?? relatedServiceId;
+    if (serviceFilter !== undefined && String(serviceFilter).trim() !== "") {
+      if (!mongoose.Types.ObjectId.isValid(String(serviceFilter))) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid serviceId.",
+        });
+      }
+      // Menus saved before serviceIds existed only have relatedServiceId.
+      andConditions.push({
+        $or: [{ serviceIds: String(serviceFilter) }, { relatedServiceId: String(serviceFilter) }],
+      });
     }
 
         if (menuClass !== undefined) {
@@ -515,7 +673,37 @@ export const updateMenu = async (
             menuCategory,
             pricePerHead,
             chefId,
+            menuKind,
+            attributes,
+            relatedServiceId,
         } = body;
+
+        if (body.serviceIds !== undefined || relatedServiceId !== undefined) {
+            const parsedServices = await parseServiceIds(body);
+            if (parsedServices.error || !parsedServices.ids) {
+                return res
+                    .status(parsedServices.status ?? 400)
+                    .json({ success: false, message: parsedServices.error ?? "Select at least one service for this menu." });
+            }
+            menu.serviceIds = parsedServices.ids as any;
+            menu.relatedServiceId = parsedServices.ids[0];
+        }
+
+        const parsedKind = parseMenuKind(menuKind);
+        if (parsedKind.error) {
+            return res.status(400).json({ success: false, message: parsedKind.error });
+        }
+        if (parsedKind.kind !== undefined) {
+            menu.menuKind = parsedKind.kind ?? undefined;
+        }
+
+        const parsedAttributes = parseMenuAttributes(attributes);
+        if (parsedAttributes.error) {
+            return res.status(400).json({ success: false, message: parsedAttributes.error });
+        }
+        if (parsedAttributes.attributes !== undefined) {
+            menu.attributes = parsedAttributes.attributes;
+        }
 
         const previousMenuTypeIds = menu.menuCategory.map((id) => id.toString());
 

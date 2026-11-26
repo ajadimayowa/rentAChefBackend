@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="x-apple-disable-message-reformatting" />
+  <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
+  <meta name="color-scheme" content="light" />
+  <meta name="supported-color-schemes" content="light" />
+  <title>Invoice {{invoiceNumber}}</title>
+  <!--[if mso]>
+  <noscript>
+    <xml>
+      <o:OfficeDocumentSettings>
+        <o:PixelsPerInch>96</o:PixelsPerInch>
+      </o:OfficeDocumentSettings>
+    </xml>
+  </noscript>
+  <![endif]-->
+  <style>
+    body, table, td { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+    body { margin:0; padding:0; width:100% !important; background-color:#F3F4F6; }
+    table { border-collapse:collapse; }
+    img { border:0; line-height:100%; outline:none; text-decoration:none; }
+    a { color:#EA580C; }
+    @media only screen and (max-width:600px) {
+      .email-container { width:100% !important; }
+      .email-padding { padding-left:20px !important; padding-right:20px !important; }
+    }
+  </style>
+</head>
+<body style="margin:0; padding:0; background-color:#F3F4F6;">
+  <div style="display:none; max-height:0; overflow:hidden; mso-hide:all; font-size:1px; line-height:1px; color:#F3F4F6;">
+    Invoice {{invoiceNumber}} for {{serviceName}}: {{total}}&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;
+  </div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F3F4F6;">
+    <tr>
+      <td align="center" style="padding:32px 16px;">
+        <table role="presentation" class="email-container" width="600" cellpadding="0" cellspacing="0" style="width:600px; max-width:600px; background-color:#FFFFFF; border-radius:12px; overflow:hidden; border:1px solid #E5E7EB;">
+
+          <tr>
+            <td style="background-color:#EA580C; height:4px; line-height:4px; font-size:1px;">&nbsp;</td>
+          </tr>
+
+          <!-- Header -->
+          <tr>
+            <td class="email-padding" style="padding:28px 32px 20px 32px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td valign="middle" width="44">
+                    <img src="cid:logo" width="40" height="40" alt="RentAChef" style="display:block; border-radius:8px;" />
+                  </td>
+                  <td valign="middle" style="padding-left:10px;">
+                    <span style="font-size:18px; font-weight:700; color:#1F2937;">RentAChef</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 32px;"><div style="border-top:1px solid #E5E7EB; line-height:1px; font-size:1px;">&nbsp;</div></td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td class="email-padding" style="padding:28px 32px 8px 32px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 16px 0;">
+                <tr>
+                  <td style="background-color:#FFF7ED; border-radius:999px; padding:6px 14px; font-size:12px; font-weight:700; letter-spacing:0.02em; color:#C2410C;">
+                    Invoice {{invoiceNumber}}
+                  </td>
+                </tr>
+              </table>
+              <h1 style="margin:0 0 8px 0; font-size:20px; line-height:28px; color:#1F2937;">Hi {{firstName}}, here is your invoice</h1>
+              <p style="margin:0; font-size:15px; line-height:24px; color:#374151;">{{serviceName}} &middot; issued {{issuedOn}}. This invoice is for your records; your booking is confirmed once payment is made in the app.</p>
+            </td>
+          </tr>
+
+          <!-- Booking details -->
+          <tr>
+            <td class="email-padding" style="padding:20px 32px 0 32px;">
+              <p style="margin:0 0 8px 0; font-size:13px; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; color:#6B7280;">Booking details</p>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #E5E7EB; border-radius:8px;">
+                {{#each details}}
+                <tr>
+                  <td style="padding:10px 14px; font-size:14px; color:#6B7280; border-bottom:1px solid #F3F4F6; width:42%; vertical-align:top;">{{label}}</td>
+                  <td style="padding:10px 14px; font-size:14px; color:#111827; border-bottom:1px solid #F3F4F6; vertical-align:top;">{{value}}</td>
+                </tr>
+                {{/each}}
+              </table>
+            </td>
+          </tr>
+
+          <!-- Price -->
+          <tr>
+            <td class="email-padding" style="padding:20px 32px 0 32px;">
+              <p style="margin:0 0 8px 0; font-size:13px; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; color:#6B7280;">Price</p>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #E5E7EB; border-radius:8px;">
+                {{#each lines}}
+                <tr>
+                  <td style="padding:10px 14px; font-size:14px; color:#111827; border-bottom:1px solid #F3F4F6; vertical-align:top;">
+                    {{label}}{{#if hint}}<br /><span style="font-size:12px; color:#6B7280;">{{hint}}</span>{{/if}}
+                  </td>
+                  <td align="right" style="padding:10px 14px; font-size:14px; color:#111827; border-bottom:1px solid #F3F4F6; white-space:nowrap; vertical-align:top;">{{amount}}</td>
+                </tr>
+                {{/each}}
+                <tr>
+                  <td style="padding:14px; font-size:16px; font-weight:700; color:#111827; background-color:#F9FAFB;">Total to pay</td>
+                  <td align="right" style="padding:14px; font-size:16px; font-weight:700; color:#111827; background-color:#F9FAFB; white-space:nowrap;">{{total}}</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <tr>
+            <td class="email-padding" style="padding:20px 32px 28px 32px; font-size:14px; line-height:22px; color:#4B5563;">
+              <p style="margin:16px 0 0 0;">Need help? Call <a href="tel:+2348166064166" style="color:#EA580C; text-decoration:none;">+234 816 606 4166</a> or email <a href="mailto:support@floatsolutionhub.com" style="color:#EA580C; text-decoration:none;">support@floatsolutionhub.com</a>.</p>
+            </td>
+          </tr>
+
+          <!-- Footer image -->
+          <tr>
+            <td style="background-color:{{orgPrimaryColor}}; line-height:0; font-size:0;">
+              <img src="cid:footer" width="600" height="120" alt="RentAChef" style="display:block; width:100%; max-width:600px; height:auto;" />
+            </td>
+          </tr>
+
+          <!-- Legal footer -->
+          <tr>
+            <td style="padding:20px 32px; background-color:#F9FAFB; font-size:12px; line-height:18px; color:#9CA3AF; text-align:center;">
+              This invoice was sent because you requested it in the RentAChef app &mdash; please don't reply directly to this email.<br />
+              &copy; RentAChef, a product of Float Solutions Hub. All rights reserved.
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

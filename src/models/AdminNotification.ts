@@ -11,6 +11,7 @@ export type AdminNotificationType =
   | "payment-confirmed"
   | "chef-accepted"
   | "chef-declined"
+  | "booking-updated"
   | "system";
 
 export interface IAdminNotification extends Document {
@@ -29,7 +30,7 @@ const AdminNotificationSchema = new Schema<IAdminNotification>(
   {
     type: {
       type: String,
-      enum: ["new-booking", "new-customer", "payment-confirmed", "chef-accepted", "chef-declined", "system"],
+      enum: ["new-booking", "new-customer", "payment-confirmed", "chef-accepted", "chef-declined", "booking-updated", "system"],
       required: true,
     },
     title: { type: String, required: true },

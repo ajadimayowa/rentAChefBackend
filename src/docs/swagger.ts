@@ -509,7 +509,9 @@ const swaggerDefinition = {
         type: "object",
         properties: {
           id: { type: "string" },
+          title: { type: "string" },
           description: { type: "string" },
+          termsUrl: { type: "string" },
           serviceId: { type: "string", nullable: true },
           categoryId: { type: "string", nullable: true },
           specialMenuId: { type: "string", nullable: true },
@@ -519,9 +521,11 @@ const swaggerDefinition = {
       },
       TermsAndConCreateRequest: {
         type: "object",
-        required: ["description"],
+        required: ["title", "description"],
         properties: {
+          title: { type: "string", example: "Refund policy" },
           description: { type: "string", example: "Payments are non-refundable after confirmation." },
+          termsUrl: { type: "string", example: "https://rentachefapp.com/terms" },
           serviceId: { type: "string", example: "686d53adf9f59b20d4b9da01" },
           categoryId: { type: "string", example: "686d53adf9f59b20d4b9da02" },
           specialMenuId: { type: "string", example: "687f1c8c7e3f2c0012ab9001" },
@@ -530,7 +534,9 @@ const swaggerDefinition = {
       TermsAndConUpdateRequest: {
         type: "object",
         properties: {
+          title: { type: "string", example: "Rescheduling" },
           description: { type: "string", example: "Reschedule requests require 48 hours notice." },
+          termsUrl: { type: "string", example: "https://rentachefapp.com/terms" },
           serviceId: { type: "string", nullable: true, example: "686d53adf9f59b20d4b9da01" },
           categoryId: { type: "string", nullable: true, example: "686d53adf9f59b20d4b9da02" },
           specialMenuId: { type: "string", nullable: true, example: "687f1c8c7e3f2c0012ab9001" },

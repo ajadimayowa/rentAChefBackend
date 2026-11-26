@@ -1,4 +1,10 @@
 import { Router } from 'express';
+import multer from 'multer';
+import { NextFunction, Request, Response } from 'express';
+import { MAX_UPLOAD_LABEL, uploadCustomerMenuPdf } from '../middleware/upload';
+import { uploadCustomerMenu } from '../controllers/booking/customerMenuUpload.controller';
+import { requireAuth } from '../middleware/auth/requireAuth.middleware';
+import { updateCustomerBooking } from '../controllers/booking/customerBookingUpdate.controller';
 import {
   assignChef,
   confirmPaymentWebhook,
@@ -118,6 +124,20 @@ router.get('/bookings', listBookings);
  *         description: Booking not found
  */
 router.get('/bookings/:id', verifyUserToken, getBookingDetail);
+// The customer edits their own booking's details (not price-setting choices).
+router.put('/bookings/:id', requireAuth(['Customer']), updateCustomerBooking);
+
+// A customer's menu PDF for a booking request (2 MB max, PDF only).
+const menuPdfUpload = (req: Request, res: Response, next: NextFunction) =>
+  uploadCustomerMenuPdf.single('menuPdf')(req, res, (err: any) => {
+    if (!err) return next();
+    const message =
+      err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE'
+        ? `The PDF must be ${MAX_UPLOAD_LABEL} or smaller`
+        : err.message || 'Could not upload the menu';
+    return res.status(400).json({ success: false, message });
+  });
+router.post('/bookings/menu-upload', requireAuth(['Customer']), menuPdfUpload, uploadCustomerMenu);
 
 /**
  * @openapi

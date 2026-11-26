@@ -8,8 +8,11 @@ export interface IGrocery {
 
 export type MenuCreatorType = "chef" | "organization";
 export type MenuType = "breakfast" | "lunch" | "dinner";
-export type MenuClass = "nigerian" | "continental";
+export type MenuClass = "nigerian" | "continental" | "intercontinental";
 export type PricingModel = "perhead" | "plater";
+/** Tier a menu is sold under, e.g. on the date night "Choose your menu" step. */
+export type MenuKind = "classic" | "premium" | "signature";
+export const MENU_KINDS: MenuKind[] = ["classic", "premium", "signature"];
 
 
 export interface IMenu extends Document {
@@ -29,9 +32,18 @@ export interface IMenu extends Document {
 
   pricingModel?: PricingModel;
 
+  menuKind?: MenuKind;
+
+  /** Courses or features shown on the menu card, in order, e.g. ["Starter", "Main", "Dessert"]. */
+  attributes: string[];
+
   menuCategory: Types.ObjectId[];
 
+  /** First of serviceIds — kept for older clients that read a single service. */
   relatedServiceId?: Types.ObjectId;
+
+  /** Every service this menu is offered on. */
+  serviceIds: Types.ObjectId[];
 
   pricePerHead: number;
 
@@ -113,6 +125,12 @@ const Menu = new Schema<IMenu>(
       ref: "Service",
       required: true,
     },
+
+    serviceIds: {
+      type: [{ type: Schema.Types.ObjectId, ref: "Service" }],
+      default: [],
+      index: true,
+    },
     
     menuType: {
       type: String,
@@ -122,7 +140,7 @@ const Menu = new Schema<IMenu>(
 
     menuClass: {
       type: String,
-      enum: ["nigerian", "continental"],
+      enum: ["nigerian", "continental", "intercontinental"],
       required: false,
     },
 
@@ -130,6 +148,18 @@ const Menu = new Schema<IMenu>(
       type: String,
       enum: ["perhead", "plater"],
       required: false,
+    },
+
+    menuKind: {
+      type: String,
+      enum: MENU_KINDS,
+      required: false,
+      index: true,
+    },
+
+    attributes: {
+      type: [{ type: String, trim: true }],
+      default: [],
     },
 
     samplePicture: {
@@ -188,6 +218,10 @@ const Menu = new Schema<IMenu>(
       transform: function (_doc, ret: any) {
         ret.id = ret._id.toString();
         delete ret._id;
+        // Menus saved before serviceIds existed report their single service.
+        if ((!Array.isArray(ret.serviceIds) || ret.serviceIds.length === 0) && ret.relatedServiceId) {
+          ret.serviceIds = [ret.relatedServiceId];
+        }
         return ret;
       },
     },
@@ -195,6 +229,13 @@ const Menu = new Schema<IMenu>(
 );
 
 Menu.pre("save", function (next) {
+  // Keep the single-service field in step with the list.
+  if (this.serviceIds?.length) {
+    this.relatedServiceId = this.serviceIds[0];
+  } else if (this.relatedServiceId) {
+    this.serviceIds = [this.relatedServiceId] as any;
+  }
+
   const groceries = Array.isArray(this.groceries) ? this.groceries : [];
 
   this.totalGroceryCost = groceries.reduce(

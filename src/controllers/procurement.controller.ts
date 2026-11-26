@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import Procurement from '../models/Procurement';
+import { InvoiceModel } from '../models/Invoice';
 import axios from 'axios';
 import { Types } from 'mongoose';
 import { BookingModel } from '../models/Booking';
@@ -354,7 +355,9 @@ export const payOutstandingProcurements = async (req: Request, res: Response): P
       return res.status(409).json({ success: false, message: 'These procurements have already been paid' });
     }
 
-    const reused = await Procurement.exists({ _id: { $nin: ids }, paymentReference });
+    const reused =
+      (await Procurement.exists({ _id: { $nin: ids }, paymentReference })) ||
+      (await InvoiceModel.exists({ paymentReference }));
     if (reused) return res.status(409).json({ success: false, message: 'This payment reference has already been used' });
 
     const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;

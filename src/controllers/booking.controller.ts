@@ -1,4 +1,7 @@
 import { notifyAdmins } from '../services/adminNotifications';
+import mongoose from "mongoose";
+import { InvoiceModel } from "../models/Invoice";
+import Procurement from "../models/Procurement";
 import { Request, Response } from 'express';
 import axios from 'axios';
 import { buildChefPlatformModule } from '../platform/bootstrap';
@@ -168,10 +171,69 @@ export const listBookings = async (req: Request, res: Response): Promise<void> =
       limit: Number.isFinite(parsedLimit) ? parsedLimit : 10,
     });
 
-    res.status(200).json({ success: true, data: rows.items, pagination: rows.pagination });
+    const items = await withDocumentSummaries(rows.items as any[]);
+    res.status(200).json({ success: true, data: items, pagination: rows.pagination });
   } catch (error: any) {
     res.status(400).json({ success: false, message: error.message });
   }
+};
+
+interface DocumentSummary {
+  count: number;
+  paidCount: number;
+  /** Naira. */
+  total: number;
+  outstanding: number;
+}
+
+/**
+ * Adds `invoiceSummary` and `procurementSummary` to each booking in a list, so
+ * booking cards can show whether invoices and procurement are paid. Two grouped
+ * queries for the whole page, not one per booking.
+ */
+const withDocumentSummaries = async (items: any[]): Promise<any[]> => {
+  const ids = items.map((b) => b.id ?? b._id).filter((id) => mongoose.Types.ObjectId.isValid(String(id)));
+  if (!ids.length) return items;
+  const objectIds = ids.map((id) => new mongoose.Types.ObjectId(String(id)));
+
+  const [invoiceGroups, procurementGroups] = await Promise.all([
+    InvoiceModel.aggregate([
+      { $match: { bookingId: { $in: objectIds } } },
+      {
+        $group: {
+          _id: "$bookingId",
+          count: { $sum: 1 },
+          paidCount: { $sum: { $cond: [{ $eq: ["$isPaid", true] }, 1, 0] } },
+          total: { $sum: "$amount" },
+          outstanding: { $sum: { $cond: [{ $eq: ["$isPaid", true] }, 0, "$amount"] } },
+        },
+      },
+    ]),
+    Procurement.aggregate([
+      { $match: { bookingId: { $in: objectIds } } },
+      {
+        $group: {
+          _id: "$bookingId",
+          count: { $sum: 1 },
+          paidCount: { $sum: { $cond: [{ $eq: ["$isProcurementPaid", true] }, 1, 0] } },
+          total: { $sum: "$totalCost" },
+          outstanding: { $sum: { $cond: [{ $eq: ["$isProcurementPaid", true] }, 0, "$totalCost"] } },
+        },
+      },
+    ]),
+  ]);
+
+  const toMap = (groups: any[]) =>
+    new Map<string, DocumentSummary>(
+      groups.map((g) => [String(g._id), { count: g.count, paidCount: g.paidCount, total: g.total, outstanding: g.outstanding }])
+    );
+  const invoices = toMap(invoiceGroups);
+  const procurements = toMap(procurementGroups);
+
+  return items.map((b) => {
+    const key = String(b.id ?? b._id);
+    return { ...b, invoiceSummary: invoices.get(key) ?? null, procurementSummary: procurements.get(key) ?? null };
+  });
 };
 
 export const generateQuotation = async (req: Request, res: Response): Promise<void> => {
